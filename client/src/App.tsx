@@ -1,0 +1,234 @@
+import { useEffect, useState, useCallback } from 'react';
+import Sidebar from './components/Sidebar';
+import FlashCard from './components/FlashCard';
+import AddCardsPanel from './components/AddCardsPanel';
+import {
+  fetchProblems,
+  fetchTags,
+  fetchProblem,
+  triggerSync,
+  fetchConfig,
+  fetchActivity,
+  pingActivity,
+  updateProblem,
+  fetchAuthStatus,
+  startLogin,
+  fetchLoginStatus,
+} from './api';
+import type { ProblemSummary, ProblemDetail, ActivityData, AuthStatus, LoginState } from './api';
+import './styles.css';
+
+export default function App() {
+  const [problems, setProblems] = useState<ProblemSummary[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
+  const [difficulty, setDifficulty] = useState('');
+  const [tag, setTag] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<'own' | 'public' | ''>('');
+  const [index, setIndex] = useState(0);
+  const [current, setCurrent] = useState<ProblemDetail | null>(null);
+  const [flipped, setFlipped] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
+  const [syncMessage, setSyncMessage] = useState('');
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [activity, setActivity] = useState<ActivityData | null>(null);
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [pendingSlug, setPendingSlug] = useState<string | null>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  const [loginState, setLoginState] = useState<LoginState | null>(null);
+
+  const loadProblems = useCallback(() => {
+    fetchProblems({ difficulty, tag, q: search, source: sourceFilter }).then((list) => {
+      setProblems(list);
+      if (pendingSlug) {
+        const i = list.findIndex((p) => p.slug === pendingSlug);
+        setPendingSlug(null);
+        if (i >= 0) {
+          setIndex(i);
+          return;
+        }
+      }
+      setIndex(0);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [difficulty, tag, search, sourceFilter, pendingSlug]);
+
+  useEffect(() => {
+    fetchConfig().then((c) => setAiEnabled(c.aiEnabled));
+    fetchActivity().then(setActivity);
+    fetchAuthStatus().then(setAuthStatus);
+  }, []);
+
+  useEffect(() => {
+    fetchTags().then(setTags);
+  }, [syncStatus]);
+
+  useEffect(() => {
+    const id = setTimeout(loadProblems, 200);
+    return () => clearTimeout(id);
+  }, [loadProblems]);
+
+  useEffect(() => {
+    setFlipped(false);
+    const slug = problems[index]?.slug;
+    if (!slug) {
+      setCurrent(null);
+      return;
+    }
+    fetchProblem(slug).then(setCurrent);
+    pingActivity().then(setActivity);
+  }, [problems, index]);
+
+  const goNext = useCallback(() => {
+    setIndex((i) => Math.min(i + 1, problems.length - 1));
+  }, [problems.length]);
+
+  const goPrev = useCallback(() => {
+    setIndex((i) => Math.max(i - 1, 0));
+  }, []);
+
+  const shuffle = useCallback(() => {
+    setIndex(Math.floor(Math.random() * problems.length));
+  }, [problems.length]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLSelectElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setFlipped((f) => !f);
+      } else if (e.code === 'ArrowRight') {
+        goNext();
+      } else if (e.code === 'ArrowLeft') {
+        goPrev();
+      } else if (e.code === 'KeyS') {
+        shuffle();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [goNext, goPrev, shuffle]);
+
+  async function handleSync() {
+    setSyncStatus('running');
+    setSyncMessage('Pulling accepted submissions from LeetCode…');
+    try {
+      const summary = await triggerSync();
+      setSyncStatus('done');
+      setSyncMessage(
+        `Synced ${summary.updated} new/updated, ${summary.skipped} already up to date (of ${summary.totalAccepted} accepted).`
+      );
+      loadProblems();
+    } catch (err) {
+      setSyncStatus('error');
+      setSyncMessage(err instanceof Error ? err.message : 'Sync failed');
+    }
+  }
+
+  async function handleConnect() {
+    const s = await startLogin();
+    setLoginState(s);
+  }
+
+  // While a browser-assisted login is in progress, poll for it to finish,
+  // then refresh auth status and auto-sync — this is the "log in and it
+  // just syncs" flow instead of manually pasting cookies.
+  useEffect(() => {
+    if (loginState?.status !== 'waiting') return;
+    const id = setInterval(async () => {
+      const s = await fetchLoginStatus();
+      setLoginState(s);
+      if (s.status === 'success') {
+        const auth = await fetchAuthStatus();
+        setAuthStatus(auth);
+        if (auth.connected) handleSync();
+      }
+    }, 1500);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loginState?.status]);
+
+  function handleImported(slug: string) {
+    setShowAddPanel(false);
+    setPendingSlug(slug);
+    loadProblems();
+  }
+
+  async function handleSaveCode(code: string, lang: string) {
+    if (!current) return;
+    const updated = await updateProblem(current.slug, { code, lang });
+    setCurrent(updated);
+  }
+
+  return (
+    <div className="app">
+      <Sidebar
+        problems={problems}
+        tags={tags}
+        search={search}
+        difficulty={difficulty}
+        tag={tag}
+        sourceFilter={sourceFilter}
+        currentSlug={problems[index]?.slug}
+        syncStatus={syncStatus}
+        syncMessage={syncMessage}
+        activity={activity}
+        authStatus={authStatus}
+        loginState={loginState}
+        onSearchChange={setSearch}
+        onDifficultyChange={setDifficulty}
+        onTagChange={setTag}
+        onSourceFilterChange={setSourceFilter}
+        onSelect={(slug) => setIndex(problems.findIndex((p) => p.slug === slug))}
+        onSync={handleSync}
+        onAddCards={() => setShowAddPanel(true)}
+        onConnect={handleConnect}
+      />
+
+      <main className="main">
+        {current ? (
+          <>
+            <div className="deck-controls">
+              <button onClick={goPrev} disabled={index === 0}>
+                ← Prev
+              </button>
+              <span className="progress">
+                {index + 1} / {problems.length}
+              </span>
+              <button onClick={goNext} disabled={index === problems.length - 1}>
+                Next →
+              </button>
+              <button className="shuffle-btn" onClick={shuffle}>
+                🔀 Shuffle
+              </button>
+            </div>
+            <FlashCard
+              problem={current}
+              flipped={flipped}
+              onFlip={() => setFlipped((f) => !f)}
+              onSaveCode={handleSaveCode}
+            />
+          </>
+        ) : (
+          <div className="empty-main">
+            <p>No flashcards yet.</p>
+            <p>Connect LeetCode to sync your own solves, or use "+ Add Cards" for public/AI ones.</p>
+          </div>
+        )}
+      </main>
+
+      {showAddPanel && (
+        <AddCardsPanel
+          aiEnabled={aiEnabled}
+          onClose={() => setShowAddPanel(false)}
+          onImported={handleImported}
+        />
+      )}
+    </div>
+  );
+}
