@@ -2,6 +2,8 @@ import type { ProblemSummary, ActivityData, AuthStatus, LoginState } from '../ap
 import StreakBoard from './StreakBoard';
 
 interface Props {
+  collapsed: boolean;
+  view: 'deck' | 'analysis';
   problems: ProblemSummary[];
   tags: string[];
   search: string;
@@ -14,6 +16,7 @@ interface Props {
   activity: ActivityData | null;
   authStatus: AuthStatus | null;
   loginState: LoginState | null;
+  offline: boolean;
   onSearchChange: (v: string) => void;
   onDifficultyChange: (v: string) => void;
   onTagChange: (v: string) => void;
@@ -22,6 +25,7 @@ interface Props {
   onSync: () => void;
   onAddCards: () => void;
   onConnect: () => void;
+  onViewChange: (v: 'deck' | 'analysis') => void;
 }
 
 const DIFFICULTIES = ['', 'Easy', 'Medium', 'Hard'];
@@ -34,6 +38,8 @@ const SOURCES: { value: 'own' | 'public' | ''; label: string }[] = [
 const SOURCE_TAG: Record<string, string> = { own: 'MINE', manual: 'PASTE', ai: 'AI' };
 
 export default function Sidebar({
+  collapsed,
+  view,
   problems,
   tags,
   search,
@@ -46,6 +52,7 @@ export default function Sidebar({
   activity,
   authStatus,
   loginState,
+  offline,
   onSearchChange,
   onDifficultyChange,
   onTagChange,
@@ -54,18 +61,27 @@ export default function Sidebar({
   onSync,
   onAddCards,
   onConnect,
+  onViewChange,
 }: Props) {
   const connected = !!authStatus?.connected;
   const loggingIn = loginState?.status === 'waiting';
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
-        <h1>
-          <span className="title-glow">LEETCODE</span>
-          <br />
-          FLASHCARDS
-        </h1>
+        <h1 className="title-glow">HaLeeCo</h1>
+      </div>
+
+      <div className="view-tabs">
+        <button className={view === 'deck' ? 'active' : ''} onClick={() => onViewChange('deck')}>
+          🃏 Deck
+        </button>
+        <button
+          className={view === 'analysis' ? 'active' : ''}
+          onClick={() => onViewChange('analysis')}
+        >
+          📊 Analysis
+        </button>
       </div>
 
       <StreakBoard activity={activity} />
@@ -75,12 +91,16 @@ export default function Sidebar({
           <span className="connect-label">
             ✓ <span className="connect-user">@{authStatus?.username}</span>
           </span>
-          <button className="pixel-btn ghost small reconnect-btn" onClick={onConnect}>
+          <button
+            className="pixel-btn ghost small reconnect-btn"
+            onClick={onConnect}
+            disabled={offline}
+          >
             reconnect
           </button>
         </div>
       ) : (
-        <button className="pixel-btn accent" onClick={onConnect} disabled={loggingIn}>
+        <button className="pixel-btn accent" onClick={onConnect} disabled={loggingIn || offline}>
           {loggingIn ? 'WAITING FOR LOGIN…' : '🔗 CONNECT LEETCODE'}
         </button>
       )}
@@ -89,10 +109,14 @@ export default function Sidebar({
       )}
 
       <div className="action-row">
-        <button className="pixel-btn" onClick={onSync} disabled={syncStatus === 'running' || !connected}>
+        <button
+          className="pixel-btn"
+          onClick={onSync}
+          disabled={syncStatus === 'running' || !connected || offline}
+        >
           {syncStatus === 'running' ? 'SYNCING…' : 'SYNC MINE'}
         </button>
-        <button className="pixel-btn accent" onClick={onAddCards}>
+        <button className="pixel-btn accent" onClick={onAddCards} disabled={offline}>
           + ADD CARDS
         </button>
       </div>

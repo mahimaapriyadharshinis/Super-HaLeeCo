@@ -27,6 +27,21 @@
   background-size: 24px 24px;
 }
 
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--medium);
+  color: #14110a;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  padding: 6px 12px;
+  letter-spacing: 0.3px;
+}
+
 /* ---------- Reusable pixel-bordered panel ---------- */
 .pixel-panel {
   position: relative;
@@ -90,11 +105,41 @@
   padding: 16px;
   overflow-y: auto;
   gap: 14px;
+  transition: width 0.2s, padding 0.2s;
+}
+
+.sidebar.collapsed {
+  width: 0;
+  padding: 16px 0;
+  overflow: hidden;
+  border-right: none;
+}
+
+.sidebar-toggle {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;
+  width: 18px;
+  height: 48px;
+  background: var(--panel-2);
+  border: 2px solid var(--neon-dim);
+  border-left: none;
+  color: var(--neon);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 14px;
+  transition: left 0.2s;
+}
+
+.sidebar-toggle:hover {
+  border-color: var(--neon);
+  color: var(--neon-bright);
 }
 
 .sidebar-header h1 {
   font-family: var(--pixel-font);
-  font-size: 13px;
+  font-size: 20px;
   line-height: 1.7;
   margin: 0;
   color: var(--neon);
@@ -103,6 +148,28 @@
 
 .title-glow {
   color: var(--neon-bright);
+}
+
+.view-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.view-tabs button {
+  flex: 1;
+  font-family: var(--mono);
+  padding: 7px 4px;
+  background: var(--panel-2);
+  border: 2px solid var(--neon-dim);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.view-tabs button.active {
+  color: var(--neon);
+  border-color: var(--neon);
+  background: rgba(57, 255, 106, 0.08);
 }
 
 .action-row {
@@ -515,6 +582,21 @@ select:focus {
   color: var(--text-dim);
 }
 
+.solve-it-link {
+  margin-left: auto;
+  background: var(--panel-2);
+  border: 1px solid var(--neon);
+  padding: 3px 9px;
+  font-size: 10px;
+  color: var(--neon-bright);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.solve-it-link:hover {
+  box-shadow: 0 0 6px rgba(57, 255, 106, 0.4);
+}
+
 .problem-content {
   margin-top: 16px;
   line-height: 1.6;
@@ -563,9 +645,10 @@ select:focus {
   font-style: italic;
 }
 
-.edit-code-btn {
+.back-actions {
   margin-top: 10px;
-  align-self: flex-start;
+  display: flex;
+  gap: 8px;
 }
 
 .code-edit {
@@ -741,6 +824,17 @@ select:focus {
   color: var(--text-dim);
 }
 
+.random-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.smart-pick-hint {
+  margin: 0;
+  font-size: 11px;
+  font-style: italic;
+}
+
 .manual-form {
   display: flex;
   flex-direction: column;
@@ -755,4 +849,170 @@ select:focus {
 .manual-row select,
 .manual-row input {
   flex: 1;
+}
+
+/* ---------- Landing page ---------- */
+.landing {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  background: var(--bg);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url('/landing-hands.webp');
+  background-size: cover;
+  background-position: center 30%;
+  background-repeat: no-repeat;
+  /* The photo's black background isn't pixel-identical to --bg — screen
+     blending drops the black to transparent so there's no visible seam. */
+  mix-blend-mode: screen;
+  opacity: 0.6;
+}
+
+.landing-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+  padding: 24px;
+}
+
+.landing-title {
+  font-family: var(--pixel-font);
+  font-size: 42px;
+  color: var(--neon-bright);
+  text-shadow: 0 0 16px rgba(57, 255, 106, 0.7);
+  margin: 0;
+}
+
+.landing-tagline {
+  font-size: 13px;
+  color: var(--text);
+  margin: 0;
+  max-width: 420px;
+  text-shadow: 0 0 4px #000, 0 0 4px #000, 0 0 8px #000;
+}
+
+.landing-portal {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: min(360px, 86vw);
+  background-color: var(--bg);
+}
+
+.landing-connected {
+  font-size: 13px;
+  color: var(--neon-bright);
+  margin: 0;
+}
+
+.landing-skip {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+  text-decoration: underline;
+}
+
+/* ---------- Analysis view ---------- */
+.analysis-view {
+  width: min(760px, 92vw);
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.analysis-loading {
+  margin: auto;
+  color: var(--text-dim);
+}
+
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.analysis-header h2 {
+  font-family: var(--pixel-font);
+  font-size: 14px;
+  color: var(--neon);
+  margin: 0;
+}
+
+.analysis-summary {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.analysis-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.analysis-row {
+  display: grid;
+  grid-template-columns: 170px 1fr 32px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.analysis-label {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-row.unsolved .analysis-label {
+  color: var(--medium);
+}
+
+.analysis-bar-track {
+  height: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--neon-dim);
+}
+
+.analysis-bar-fill {
+  height: 100%;
+  background: var(--neon-dim);
+}
+
+.analysis-row.unsolved .analysis-bar-fill {
+  background: var(--medium);
+  opacity: 0.5;
+}
+
+.analysis-count {
+  text-align: right;
+  color: var(--text-dim);
+}
+
+.analysis-subheading {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 4px 0 0;
+  text-transform: uppercase;
+}
+
+.analysis-all-tags {
+  margin-top: 0;
 }

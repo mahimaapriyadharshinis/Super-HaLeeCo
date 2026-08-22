@@ -1,14 +1,16 @@
 export type Source = 'own' | 'manual' | 'ai';
+export type Platform = 'leetcode' | 'codeforces' | 'hackerrank';
 
 export interface ProblemSummary {
   slug: string;
   questionId: string | null;
   title: string;
-  difficulty: 'Easy' | 'Medium' | 'Hard';
+  difficulty: string;
   tags: string[];
   lang: string;
   submittedAt: number;
   source: Source;
+  platform: Platform | 'manual';
 }
 
 export interface ProblemDetail extends ProblemSummary {
@@ -17,6 +19,7 @@ export interface ProblemDetail extends ProblemSummary {
   exampleTestcases: string;
   code: string;
   syncedAt: number;
+  sourceUrl: string | null;
 }
 
 export interface SyncSummary {
@@ -32,6 +35,32 @@ export interface PublicQuestion {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   isPaidOnly: boolean;
   topicTags: { name: string }[];
+}
+
+export interface RandomResult {
+  platform: Platform;
+  id: string;
+  title: string;
+  difficulty: string;
+  tags: string[];
+  topic?: string | null;
+}
+
+export interface TopicStat {
+  slug: string;
+  name: string;
+  count: number;
+}
+
+export interface TagStat {
+  name: string;
+  count: number;
+}
+
+export interface TopicAnalysis {
+  totalSolved: number;
+  importantTopics: TopicStat[];
+  allTags: TagStat[];
 }
 
 export interface ActivityDay {
@@ -114,11 +143,17 @@ export function searchLeetCode(q: string) {
   return fetch(`/api/leetcode/search?${search}`).then((r) => json<PublicQuestion[]>(r));
 }
 
-export function fetchRandomLeetCode() {
-  return fetch('/api/leetcode/random').then((r) => json<PublicQuestion>(r));
+export function fetchRandom(platform: Platform) {
+  const search = new URLSearchParams({ platform });
+  return fetch(`/api/random?${search}`).then((r) => json<RandomResult>(r));
 }
 
-export function importProblem(params: { slug: string; generateSolution: boolean; language?: string }) {
+export function importProblem(params: {
+  platform: Platform;
+  id: string;
+  generateSolution: boolean;
+  language?: string;
+}) {
   return fetch('/api/problems/import', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -159,4 +194,13 @@ export function fetchLoginStatus() {
 
 export function fetchActivity() {
   return fetch('/api/activity').then((r) => json<ActivityData>(r));
+}
+
+export function fetchAnalysis() {
+  return fetch('/api/analysis').then((r) => json<TopicAnalysis>(r));
+}
+
+export function fetchSmartPick(platform: Platform) {
+  const search = new URLSearchParams({ platform });
+  return fetch(`/api/smart-pick?${search}`).then((r) => json<RandomResult>(r));
 }

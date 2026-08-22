@@ -70,6 +70,8 @@ export async function runSync(onProgress) {
       submissionId: String(sub.id),
       submittedAt: Number(sub.timestamp),
       syncedAt: Math.floor(Date.now() / 1000),
+      platform: 'leetcode',
+      sourceUrl: `https://leetcode.com/problems/${q.titleSlug}/`,
     });
 
     updated += 1;

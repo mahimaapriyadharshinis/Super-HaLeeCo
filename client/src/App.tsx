@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import FlashCard from './components/FlashCard';
 import AddCardsPanel from './components/AddCardsPanel';
+import LandingPage from './components/LandingPage';
+import AnalysisView from './components/AnalysisView';
 import {
   fetchProblems,
   fetchTags,
@@ -19,6 +21,7 @@ import type { ProblemSummary, ProblemDetail, ActivityData, AuthStatus, LoginStat
 import './styles.css';
 
 export default function App() {
+  const [entered, setEntered] = useState(false);
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [search, setSearch] = useState('');
@@ -36,6 +39,27 @@ export default function App() {
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [loginState, setLoginState] = useState<LoginState | null>(null);
+  const [offline, setOffline] = useState(!navigator.onLine);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [view, setView] = useState<'deck' | 'analysis'>('deck');
+
+  // Reviewing an already-synced/added deck needs zero internet access — only
+  // Connect/Sync/Add Cards/AI talk to anything outside localhost. Surface
+  // that distinction instead of letting those calls fail with a raw error.
+  useEffect(() => {
+    function goOnline() {
+      setOffline(false);
+    }
+    function goOffline() {
+      setOffline(true);
+    }
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
 
   const loadProblems = useCallback(() => {
     fetchProblems({ difficulty, tag, q: search, source: sourceFilter }).then((list) => {
@@ -155,8 +179,12 @@ export default function App() {
 
   function handleImported(slug: string) {
     setShowAddPanel(false);
+    // Don't call loadProblems() here — it would run with this render's
+    // stale (pre-update) pendingSlug closure and jump to index 0. Setting
+    // pendingSlug triggers the debounced reload effect with a fresh
+    // closure that actually finds and jumps to the new card.
     setPendingSlug(slug);
-    loadProblems();
+    setView('deck');
   }
 
   async function handleSaveCode(code: string, lang: string) {
@@ -165,9 +193,28 @@ export default function App() {
     setCurrent(updated);
   }
 
+  if (!entered) {
+    return (
+      <LandingPage
+        authStatus={authStatus}
+        loginState={loginState}
+        onConnect={handleConnect}
+        onContinue={() => setEntered(true)}
+      />
+    );
+  }
+
   return (
     <div className="app">
+      {offline && (
+        <div className="offline-banner">
+          ⚠ OFFLINE — browsing your saved deck still works. Connect / Sync / Add Cards / AI need
+          internet.
+        </div>
+      )}
       <Sidebar
+        collapsed={sidebarCollapsed}
+        view={view}
         problems={problems}
         tags={tags}
         search={search}
@@ -180,18 +227,34 @@ export default function App() {
         activity={activity}
         authStatus={authStatus}
         loginState={loginState}
+        offline={offline}
         onSearchChange={setSearch}
         onDifficultyChange={setDifficulty}
         onTagChange={setTag}
         onSourceFilterChange={setSourceFilter}
-        onSelect={(slug) => setIndex(problems.findIndex((p) => p.slug === slug))}
+        onSelect={(slug) => {
+          setView('deck');
+          setIndex(problems.findIndex((p) => p.slug === slug));
+        }}
         onSync={handleSync}
         onAddCards={() => setShowAddPanel(true)}
         onConnect={handleConnect}
+        onViewChange={setView}
       />
 
+      <button
+        className="sidebar-toggle"
+        style={{ left: sidebarCollapsed ? 0 : 340 }}
+        onClick={() => setSidebarCollapsed((c) => !c)}
+        title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+      >
+        {sidebarCollapsed ? '›' : '‹'}
+      </button>
+
       <main className="main">
-        {current ? (
+        {view === 'analysis' ? (
+          <AnalysisView />
+        ) : current ? (
           <>
             <div className="deck-controls">
               <button onClick={goPrev} disabled={index === 0}>

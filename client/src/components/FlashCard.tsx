@@ -30,6 +30,41 @@ const SOURCE_LABEL: Record<string, string> = {
   ai: 'AI GENERATED',
 };
 
+const FILE_EXTENSIONS: Record<string, string> = {
+  python3: 'py',
+  python: 'py',
+  cpp: 'cpp',
+  'c++': 'cpp',
+  c: 'c',
+  java: 'java',
+  javascript: 'js',
+  typescript: 'ts',
+  csharp: 'cs',
+  'c#': 'cs',
+  golang: 'go',
+  go: 'go',
+  kotlin: 'kt',
+  swift: 'swift',
+  rust: 'rs',
+  ruby: 'rb',
+  scala: 'scala',
+  php: 'php',
+  mysql: 'sql',
+};
+
+function downloadCode(filenameBase: string, lang: string, code: string) {
+  const ext = FILE_EXTENSIONS[lang?.toLowerCase()] ?? 'txt';
+  const blob = new Blob([code], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filenameBase}.${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 interface Props {
   problem: ProblemDetail;
   flipped: boolean;
@@ -91,6 +126,17 @@ export default function FlashCard({ problem, flipped, onFlip, onSaveCode }: Prop
                 {t}
               </span>
             ))}
+            {problem.sourceUrl && (
+              <a
+                className="solve-it-link"
+                href={problem.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={stopFlip}
+              >
+                🔗 Solve it ↗
+              </a>
+            )}
           </div>
           <div className="problem-content" dangerouslySetInnerHTML={{ __html: cleanHtml }} />
           <div className="flip-hint">Click card or press space to reveal the code →</div>
@@ -154,17 +200,30 @@ export default function FlashCard({ problem, flipped, onFlip, onSaveCode }: Prop
               ) : (
                 <div className="code-block empty-code">No solution saved yet.</div>
               )}
-              {problem.source !== 'own' && (
-                <button
-                  className="pixel-btn small edit-code-btn"
-                  onClick={(e) => {
-                    stopFlip(e);
-                    setEditing(true);
-                  }}
-                >
-                  {problem.code ? 'Edit code' : '+ Add code'}
-                </button>
-              )}
+              <div className="back-actions">
+                {problem.source !== 'own' && (
+                  <button
+                    className="pixel-btn small edit-code-btn"
+                    onClick={(e) => {
+                      stopFlip(e);
+                      setEditing(true);
+                    }}
+                  >
+                    {problem.code ? 'Edit code' : '+ Add code'}
+                  </button>
+                )}
+                {problem.code && (
+                  <button
+                    className="pixel-btn small ghost"
+                    onClick={(e) => {
+                      stopFlip(e);
+                      downloadCode(problem.slug, problem.lang, problem.code);
+                    }}
+                  >
+                    💾 Save code
+                  </button>
+                )}
+              </div>
               <div className="flip-hint">Click card or press space to go back →</div>
             </>
           )}

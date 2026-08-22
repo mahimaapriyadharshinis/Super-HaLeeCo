@@ -13,6 +13,7 @@ import {
   slugExists,
   pingActivity,
   getActivity,
+  listSolvedProblems,
 } from './db.js';
 import { runSync } from './sync.js';
 import {
@@ -20,10 +21,21 @@ import {
   fetchRandomPublicQuestion,
   fetchPublicQuestion,
   fetchCurrentUsername,
+  fetchRandomQuestionByTag,
 } from './leetcodeClient.js';
+import {
+  fetchRandomCodeforcesProblem,
+  fetchCodeforcesStatement,
+  fetchRandomCodeforcesProblemByTopic,
+} from './codeforcesClient.js';
+import {
+  fetchRandomHackerRankChallenge,
+  fetchHackerRankChallengeDetail,
+} from './hackerrankClient.js';
 import { aiEnabled, generateSolution } from './aiGenerate.js';
 import { slugify } from './util.js';
 import { startBrowserLogin, getLoginState } from './browserLogin.js';
+import { getTopicAnalysis, pickWeakTopic } from './analysis.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
@@ -113,55 +125,183 @@ app.get('/api/leetcode/search', async (req, res) => {
   }
 });
 
-app.get('/api/leetcode/random', async (_req, res) => {
+// Grab a random problem from whichever platform. Returns a normalized
+// summary; the `id` is opaque and gets passed straight back to /import.
+app.get('/api/random', async (req, res) => {
+  const platform = req.query.platform || 'leetcode';
   try {
-    const q = await fetchRandomPublicQuestion();
-    res.json(q);
+    if (platform === 'leetcode') {
+      const q = await fetchRandomPublicQuestion();
+      return res.json({
+        platform,
+        id: q.titleSlug,
+        title: q.title,
+        difficulty: q.difficulty,
+        tags: q.topicTags.map((t) => t.name),
+      });
+    }
+    if (platform === 'codeforces') {
+      const p = await fetchRandomCodeforcesProblem();
+      return res.json({
+        platform,
+        id: `${p.contestId}:${p.index}`,
+        title: `${p.contestId}${p.index}. ${p.name}`,
+        difficulty: p.difficulty,
+        tags: p.rating ? [...p.tags, `rating ${p.rating}`] : p.tags,
+      });
+    }
+    if (platform === 'hackerrank') {
+      const c = await fetchRandomHackerRankChallenge();
+      return res.json({
+        platform,
+        id: c.slug,
+        title: c.name,
+        difficulty: c.difficulty,
+        tags: [],
+      });
+    }
+    res.status(400).json({ error: `Unknown platform "${platform}"` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Import a public problem as a flashcard. If generateSolution is true and an
-// Gemini API key is configured, a solution is written by Gemini; otherwise
-// the card is created with empty code for you to fill in yourself.
-app.post('/api/problems/import', async (req, res) => {
-  const { slug, generateSolution: wantSolution, language } = req.body;
+// Topic coverage across your own solved problems, for the Analysis view.
+app.get('/api/analysis', (_req, res) => {
+  res.json(getTopicAnalysis(listSolvedProblems()));
+});
+
+// Like /api/random, but biased toward important topics you haven't solved
+// (or have solved the least) instead of picking uniformly at random.
+app.get('/api/smart-pick', async (req, res) => {
+  const platform = req.query.platform || 'leetcode';
   try {
-    const q = await fetchPublicQuestion(slug);
+    const solved = listSolvedProblems();
+    const topic = pickWeakTopic(solved);
+
+    if (platform === 'leetcode') {
+      try {
+        const q = await fetchRandomQuestionByTag(
+          topic.slug,
+          solved.map((p) => p.slug)
+        );
+        return res.json({
+          platform,
+          id: q.titleSlug,
+          title: q.title,
+          difficulty: q.difficulty,
+          tags: q.topicTags.map((t) => t.name),
+          topic: topic.name,
+        });
+      } catch {
+        const q = await fetchRandomPublicQuestion();
+        return res.json({
+          platform,
+          id: q.titleSlug,
+          title: q.title,
+          difficulty: q.difficulty,
+          tags: q.topicTags.map((t) => t.name),
+          topic: null,
+        });
+      }
+    }
+
+    if (platform === 'codeforces') {
+      const p =
+        (await fetchRandomCodeforcesProblemByTopic(topic.slug)) ?? (await fetchRandomCodeforcesProblem());
+      return res.json({
+        platform,
+        id: `${p.contestId}:${p.index}`,
+        title: `${p.contestId}${p.index}. ${p.name}`,
+        difficulty: p.difficulty,
+        tags: p.rating ? [...p.tags, `rating ${p.rating}`] : p.tags,
+        topic: topic.name,
+      });
+    }
+
+    res.status(400).json({ error: `Smart Pick isn't available for "${platform}" yet` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Import a problem from any platform as a flashcard. If generateSolution is
+// true and a Gemini API key is configured, a solution is written by Gemini;
+// otherwise the card is created with empty code for you to fill in yourself.
+app.post('/api/problems/import', async (req, res) => {
+  const { platform = 'leetcode', id, generateSolution: wantSolution, language } = req.body;
+  try {
+    let slug, title, difficulty, tags, contentHtml, sourceUrl, questionId, sampleTestcase, exampleTestcases;
+
+    if (platform === 'leetcode') {
+      const q = await fetchPublicQuestion(id);
+      slug = q.titleSlug;
+      title = q.title;
+      difficulty = q.difficulty;
+      tags = q.topicTags.map((t) => t.name);
+      contentHtml = q.content;
+      sourceUrl = `https://leetcode.com/problems/${q.titleSlug}/`;
+      questionId = q.questionId;
+      sampleTestcase = q.sampleTestCase;
+      exampleTestcases = q.exampleTestcases;
+    } else if (platform === 'codeforces') {
+      const [contestId, index] = id.split(':');
+      const p = await fetchCodeforcesStatement(contestId, index);
+      slug = `cf-${contestId}-${index.toLowerCase()}`;
+      title = `${contestId}${index}. ${p.title}`;
+      difficulty = 'Medium';
+      tags = [];
+      contentHtml = p.contentHtml;
+      sourceUrl = `https://codeforces.com/problemset/problem/${contestId}/${index}`;
+    } else if (platform === 'hackerrank') {
+      const c = await fetchHackerRankChallengeDetail(id);
+      slug = `hr-${c.slug}`;
+      title = c.title;
+      difficulty = c.difficulty;
+      tags = c.category ? [c.category] : [];
+      contentHtml = c.contentHtml;
+      sourceUrl = `https://www.hackerrank.com/challenges/${c.slug}/problem`;
+    } else {
+      return res.status(400).json({ error: `Unknown platform "${platform}"` });
+    }
+
+    // Never let an import clobber a real synced solve of yours that happens
+    // to share the same slug (e.g. re-importing "two-sum" for an AI answer).
+    const existing = getProblem(slug);
+    if (existing && existing.source === 'own') {
+      return res.json(existing);
+    }
+
     let code = '';
     let source = 'manual';
     let lang = language || 'plaintext';
 
     if (wantSolution) {
-      code = await generateSolution({
-        title: q.title,
-        contentHtml: q.content,
-        difficulty: q.difficulty,
-        language: language || 'Python',
-      });
+      code = await generateSolution({ title, contentHtml, difficulty, language: language || 'Python' });
       source = 'ai';
       lang = language || 'Python';
     }
 
     upsertProblem({
-      slug: q.titleSlug,
-      questionId: q.questionId,
-      title: q.title,
-      difficulty: q.difficulty,
-      tags: JSON.stringify(q.topicTags.map((t) => t.name)),
-      contentHtml: q.content,
-      sampleTestcase: q.sampleTestCase,
-      exampleTestcases: q.exampleTestcases,
+      slug,
+      questionId: questionId ?? null,
+      title,
+      difficulty,
+      tags: JSON.stringify(tags),
+      contentHtml,
+      sampleTestcase: sampleTestcase ?? '',
+      exampleTestcases: exampleTestcases ?? '',
       code,
       lang,
       submissionId: null,
       submittedAt: Math.floor(Date.now() / 1000),
       syncedAt: Math.floor(Date.now() / 1000),
       source,
+      platform,
+      sourceUrl,
     });
 
-    res.json(getProblem(q.titleSlug));
+    res.json(getProblem(slug));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -196,6 +336,8 @@ app.post('/api/problems/manual', (req, res) => {
     submittedAt: Math.floor(Date.now() / 1000),
     syncedAt: Math.floor(Date.now() / 1000),
     source: 'manual',
+    platform: 'manual',
+    sourceUrl: null,
   });
 
   res.status(201).json(getProblem(uniqueSlug));

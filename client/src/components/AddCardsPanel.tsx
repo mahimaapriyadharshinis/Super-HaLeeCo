@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import {
   searchLeetCode,
-  fetchRandomLeetCode,
+  fetchRandom,
+  fetchSmartPick,
   importProblem,
   createManualProblem,
 } from '../api';
-import type { PublicQuestion } from '../api';
+import type { PublicQuestion, Platform } from '../api';
 
 const LANGUAGES = [
   'Python3',
@@ -20,6 +21,12 @@ const LANGUAGES = [
   'Rust',
 ];
 
+const PLATFORMS: { value: Platform; label: string }[] = [
+  { value: 'leetcode', label: 'LeetCode' },
+  { value: 'codeforces', label: 'Codeforces' },
+  { value: 'hackerrank', label: 'HackerRank' },
+];
+
 interface Props {
   aiEnabled: boolean;
   onClose: () => void;
@@ -32,11 +39,12 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
   const [tab, setTab] = useState<Tab>('search');
   const [genSolution, setGenSolution] = useState(aiEnabled);
   const [language, setLanguage] = useState('Python3');
+  const [randomPlatform, setRandomPlatform] = useState<Platform>('leetcode');
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PublicQuestion[]>([]);
   const [searching, setSearching] = useState(false);
-  const [busySlug, setBusySlug] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const [manualTitle, setManualTitle] = useState('');
@@ -60,12 +68,14 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
     }
   }
 
-  async function doImport(slug: string) {
-    setBusySlug(slug);
+  async function doImport(platform: Platform, id: string) {
+    const key = `${platform}:${id}`;
+    setBusyKey(key);
     setError('');
     try {
       const problem = await importProblem({
-        slug,
+        platform,
+        id,
         generateSolution: genSolution && aiEnabled,
         language,
       });
@@ -73,19 +83,31 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
     } finally {
-      setBusySlug(null);
+      setBusyKey(null);
     }
   }
 
   async function doRandom() {
-    setBusySlug('__random__');
+    setBusyKey('__random__');
     setError('');
     try {
-      const q = await fetchRandomLeetCode();
-      await doImport(q.titleSlug);
+      const r = await fetchRandom(randomPlatform);
+      await doImport(r.platform, r.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Random import failed');
-      setBusySlug(null);
+      setBusyKey(null);
+    }
+  }
+
+  async function doSmartPick() {
+    setBusyKey('__smart__');
+    setError('');
+    try {
+      const r = await fetchSmartPick(randomPlatform);
+      await doImport(r.platform, r.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Smart Pick failed');
+      setBusyKey(null);
     }
   }
 
@@ -195,10 +217,10 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
                   ) : (
                     <button
                       className="pixel-btn small"
-                      disabled={busySlug === q.titleSlug}
-                      onClick={() => doImport(q.titleSlug)}
+                      disabled={busyKey === `leetcode:${q.titleSlug}`}
+                      onClick={() => doImport('leetcode', q.titleSlug)}
                     >
-                      {busySlug === q.titleSlug ? '...' : '+ Add'}
+                      {busyKey === `leetcode:${q.titleSlug}` ? '...' : '+ Add'}
                     </button>
                   )}
                 </li>
@@ -209,10 +231,38 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
 
         {tab === 'random' && (
           <div className="random-tab">
-            <p>Pull a random free LeetCode problem and add it as a card.</p>
-            <button className="pixel-btn" onClick={doRandom} disabled={busySlug === '__random__'}>
-              {busySlug === '__random__' ? 'Fetching...' : '🎲 Random Problem'}
-            </button>
+            <p>Pull a random free problem and add it as a card.</p>
+            <div className="filter-row">
+              {PLATFORMS.map((p) => (
+                <button
+                  key={p.value}
+                  className={`filter-chip ${randomPlatform === p.value ? 'active' : ''}`}
+                  onClick={() => setRandomPlatform(p.value)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className="random-buttons">
+              <button className="pixel-btn" onClick={doRandom} disabled={busyKey === '__random__'}>
+                {busyKey === '__random__' ? 'Fetching...' : '🎲 Random'}
+              </button>
+              <button
+                className="pixel-btn accent"
+                onClick={doSmartPick}
+                disabled={busyKey === '__smart__' || randomPlatform === 'hackerrank'}
+                title={
+                  randomPlatform === 'hackerrank'
+                    ? 'Smart Pick works for LeetCode and Codeforces only'
+                    : 'Picks a problem from a topic you have not solved yet (or solved the least)'
+                }
+              >
+                {busyKey === '__smart__' ? 'Fetching...' : '🎯 Smart Pick'}
+              </button>
+            </div>
+            <p className="smart-pick-hint">
+              Smart Pick targets an important topic you're weak on or haven't solved yet.
+            </p>
           </div>
         )}
 

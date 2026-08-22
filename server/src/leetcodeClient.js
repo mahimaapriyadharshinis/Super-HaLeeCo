@@ -157,6 +157,31 @@ export async function fetchRandomPublicQuestion() {
   throw new Error('Could not find a free random question after several attempts');
 }
 
+export async function fetchRandomQuestionByTag(tagSlug, excludeSlugs = []) {
+  const excluded = new Set(excludeSlugs);
+  const countData = await publicGqlFetch(QUESTION_LIST_QUERY, {
+    categorySlug: '',
+    limit: 1,
+    skip: 0,
+    filters: { tags: [tagSlug] },
+  });
+  const total = countData.problemsetQuestionList.total;
+  if (!total) throw new Error(`No LeetCode problems found for tag "${tagSlug}"`);
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const skip = Math.floor(Math.random() * total);
+    const data = await publicGqlFetch(QUESTION_LIST_QUERY, {
+      categorySlug: '',
+      limit: 1,
+      skip,
+      filters: { tags: [tagSlug] },
+    });
+    const q = data.problemsetQuestionList.questions[0];
+    if (q && !q.isPaidOnly && !excluded.has(q.titleSlug)) return q;
+  }
+  throw new Error(`Could not find a new free problem for tag "${tagSlug}" after several attempts`);
+}
+
 const QUESTION_CONTENT_QUERY = `
   query questionContent($titleSlug: String!) {
     question(titleSlug: $titleSlug) {

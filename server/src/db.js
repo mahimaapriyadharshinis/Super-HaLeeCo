@@ -23,7 +23,9 @@ db.exec(`
     submission_id TEXT,
     submitted_at INTEGER,
     synced_at INTEGER,
-    source TEXT NOT NULL DEFAULT 'own'
+    source TEXT NOT NULL DEFAULT 'own',
+    platform TEXT NOT NULL DEFAULT 'leetcode',
+    source_url TEXT
   );
 
   CREATE TABLE IF NOT EXISTS activity (
@@ -36,17 +38,26 @@ const problemColumns = db.prepare("PRAGMA table_info(problems)").all().map((c) =
 if (!problemColumns.includes('source')) {
   db.exec("ALTER TABLE problems ADD COLUMN source TEXT NOT NULL DEFAULT 'own'");
 }
+if (!problemColumns.includes('platform')) {
+  db.exec("ALTER TABLE problems ADD COLUMN platform TEXT NOT NULL DEFAULT 'leetcode'");
+}
+if (!problemColumns.includes('source_url')) {
+  db.exec('ALTER TABLE problems ADD COLUMN source_url TEXT');
+  db.exec(
+    "UPDATE problems SET source_url = 'https://leetcode.com/problems/' || slug || '/' WHERE platform = 'leetcode' AND question_id IS NOT NULL"
+  );
+}
 
 export function upsertProblem(problem) {
   const stmt = db.prepare(`
     INSERT INTO problems (
       slug, question_id, title, difficulty, tags, content_html,
       sample_testcase, example_testcases, code, lang,
-      submission_id, submitted_at, synced_at, source
+      submission_id, submitted_at, synced_at, source, platform, source_url
     ) VALUES (
       @slug, @questionId, @title, @difficulty, @tags, @contentHtml,
       @sampleTestcase, @exampleTestcases, @code, @lang,
-      @submissionId, @submittedAt, @syncedAt, @source
+      @submissionId, @submittedAt, @syncedAt, @source, @platform, @sourceUrl
     )
     ON CONFLICT(slug) DO UPDATE SET
       question_id = excluded.question_id,
@@ -61,9 +72,11 @@ export function upsertProblem(problem) {
       submission_id = excluded.submission_id,
       submitted_at = excluded.submitted_at,
       synced_at = excluded.synced_at,
-      source = excluded.source
+      source = excluded.source,
+      platform = excluded.platform,
+      source_url = excluded.source_url
   `);
-  stmt.run({ source: 'own', submissionId: null, ...problem });
+  stmt.run({ source: 'own', submissionId: null, platform: 'leetcode', sourceUrl: null, ...problem });
 }
 
 export function updateProblemFields(slug, fields) {
@@ -101,8 +114,8 @@ export function slugExists(slug) {
   return !!db.prepare('SELECT 1 FROM problems WHERE slug = ?').get(slug);
 }
 
-export function listProblems({ difficulty, tag, q, source } = {}) {
-  let sql = `SELECT slug, question_id as questionId, title, difficulty, tags, lang, submitted_at as submittedAt, source
+export function listProblems({ difficulty, tag, q, source, platform } = {}) {
+  let sql = `SELECT slug, question_id as questionId, title, difficulty, tags, lang, submitted_at as submittedAt, source, platform
              FROM problems WHERE 1=1`;
   const params = [];
   if (difficulty) {
@@ -121,6 +134,10 @@ export function listProblems({ difficulty, tag, q, source } = {}) {
     sql += " AND source = 'own'";
   } else if (source === 'public') {
     sql += " AND source != 'own'";
+  }
+  if (platform) {
+    sql += ' AND platform = ?';
+    params.push(platform);
   }
   sql += ' ORDER BY title ASC';
   return db.prepare(sql).all(...params).map((row) => ({
@@ -146,7 +163,14 @@ export function getProblem(slug) {
     submittedAt: row.submitted_at,
     syncedAt: row.synced_at,
     source: row.source,
+    platform: row.platform,
+    sourceUrl: row.source_url,
   };
+}
+
+export function listSolvedProblems() {
+  const rows = db.prepare("SELECT slug, tags FROM problems WHERE source = 'own'").all();
+  return rows.map((row) => ({ slug: row.slug, tags: JSON.parse(row.tags || '[]') }));
 }
 
 export function allTags() {
