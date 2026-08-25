@@ -245,7 +245,7 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
             </div>
             <div className="random-buttons">
               <button className="pixel-btn" onClick={doRandom} disabled={busyKey === '__random__'}>
-                {busyKey === '__random__' ? 'Fetching...' : '🎲 Random'}
+                {busyKey === '__random__' ? 'Fetching...' : 'Random'}
               </button>
               <button
                 className="pixel-btn accent"
@@ -257,7 +257,7 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
                     : 'Picks a problem from a topic you have not solved yet (or solved the least)'
                 }
               >
-                {busyKey === '__smart__' ? 'Fetching...' : '🎯 Smart Pick'}
+                {busyKey === '__smart__' ? 'Fetching...' : 'Smart Pick'}
               </button>
             </div>
             <p className="smart-pick-hint">

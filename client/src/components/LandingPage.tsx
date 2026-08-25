@@ -40,7 +40,7 @@ export default function LandingPage({
           ) : (
             <>
               <button className="pixel-btn accent" onClick={onConnect} disabled={loggingIn}>
-                {loggingIn ? 'WAITING FOR LOGIN…' : '🔗 CONNECT LEETCODE'}
+                {loggingIn ? 'WAITING FOR LOGIN…' : 'CONNECT LEETCODE'}
               </button>
               {loginState && loginState.status !== 'idle' && (
                 <div className={`login-message login-${loginState.status}`}>{loginState.message}</div>

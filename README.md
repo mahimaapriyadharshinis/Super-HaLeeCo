@@ -1,11 +1,6 @@
-```
-╔══════════════════════════════════════╗
-║         LEETCODE FLASHCARDS          ║
-╚══════════════════════════════════════╝
-   > full question · testcases · code — as flip cards
-```
-
 <div align="center">
+
+<img src="docs/banner.png" alt="HaLeeCo banner" width="100%">
 
 ![Node](https://img.shields.io/badge/node-%3E=18-39FF6A?style=for-the-badge&logo=nodedotjs&logoColor=39FF6A&labelColor=000000)
 ![React](https://img.shields.io/badge/react-19-39FF6A?style=for-the-badge&logo=react&logoColor=39FF6A&labelColor=000000)
@@ -14,123 +9,160 @@
 ![Express](https://img.shields.io/badge/express-4-39FF6A?style=for-the-badge&logo=express&logoColor=39FF6A&labelColor=000000)
 ![SQLite](https://img.shields.io/badge/sqlite-local-39FF6A?style=for-the-badge&logo=sqlite&logoColor=39FF6A&labelColor=000000)
 ![Gemini](https://img.shields.io/badge/gemini-optional-39FF6A?style=for-the-badge&logo=googlegemini&logoColor=39FF6A&labelColor=000000)
-![Status](https://img.shields.io/badge/status-personal_project-39FF6A?style=for-the-badge&labelColor=000000)
+![Playwright](https://img.shields.io/badge/playwright-login-39FF6A?style=for-the-badge&logo=playwright&logoColor=39FF6A&labelColor=000000)
+![License](https://img.shields.io/badge/status-active-39FF6A?style=for-the-badge&labelColor=000000)
 
-**A local, terminal-themed flashcard deck for LeetCode — your own solved problems, any public
-problem, or ones you paste in yourself. Nothing leaves your machine except calls to LeetCode
-and (optionally) Gemini.**
+A local flashcard deck for coding-interview practice, built across LeetCode, Codeforces, and
+HackerRank — with a topic-analysis engine that tells you exactly what to practice next.
 
 </div>
 
 <br>
 
-## ▓ What this is
+<div align="center">
 
-Three ways a card gets into your deck:
+| 3 | 28 | 0 | 100% |
+|:---:|:---:|:---:|:---:|
+| judges integrated | DSA topics tracked | servers to pay for | of your data stays local |
 
-| Source | How | Badge |
-|---|---|---|
-| **Your own solves** | Click **Connect LeetCode**, log in in the browser window that opens, done — auto-syncs right after | `YOUR SOLVE` |
-| **Any public problem** | Search LeetCode by title, or hit random — free/non-premium problems only. Solution is Gemini-written if you opt in, otherwise blank for you to fill in | `AI GENERATED` or `PASTED` |
-| **Paste it yourself** | A form for anything from a book, a blog, or an LLM you ran elsewhere | `PASTED` |
-
-Flip a card to go from question → code. A sidebar streak board (GitHub-contributions-style)
-tracks the days you've actually reviewed something.
+</div>
 
 <br>
 
-## ▓ Screenshots
+## Overview
+
+**HaLeeCo** turns solved problems into flashcards — the question on the front, the code on
+the back. Cards come from three places: your own real submissions (synced directly from your
+account), any public problem across LeetCode, Codeforces, or HackerRank (search, random, or a
+weak-topic-aware **Smart Pick**), or ones you write in by hand.
+
+Nothing runs in the cloud. The backend is a small Node/Express service, the database is a
+single SQLite file on disk, and the only network calls made are the ones you trigger —
+to the judges themselves, and optionally to Gemini for solution generation.
+
+<br>
+
+## Features
+
+**Connecting your account**
+- One-click connect through a real, separate browser window — credentials are typed directly
+  into the judge's own login page and never touch this app
+- Manual cookie-paste fallback built into the UI, for environments where the browser flow
+  can't complete
+- Incremental sync of accepted submissions — only re-fetches what actually changed
+
+**Building the deck**
+- Search any public LeetCode problem by title
+- Random problem pull from LeetCode, Codeforces, or HackerRank
+- Smart Pick — same three judges, biased toward an important topic you're weak on or haven't
+  attempted, instead of a uniform random choice
+- Optional AI-generated solutions via Gemini, comment-free by default, with an automatic
+  self-correction pass if the model adds one anyway
+- Manual entry for content from any source
+
+**Studying**
+- Topic Analysis — every core DSA topic plotted against how many times you've solved
+  something tagged with it, so gaps are visible at a glance
+- Streak tracking with a contribution-graph-style heatmap
+- Inline code editor, one-click code download, and a direct link back to the original problem
+- Full keyboard navigation
+- Offline-aware — reviewing a saved deck needs no internet connection; the app is explicit
+  about which actions do
+
+**Engineering**
+- Fully local: SQLite on disk, both dev servers bound to loopback only
+- Filterable by source, difficulty, tag, or title across the entire deck
+- Collapsible sidebar layout
+
+<br>
+
+## Screenshots
 
 <table>
 <tr>
 <td width="50%">
 
-**Deck + streak board**
-<img src="docs/screenshots/deck-and-streak.png" alt="Sidebar with streak heatmap, filters, and deck list">
+**Landing**
+<img src="docs/screenshots/landing.png" alt="HaLeeCo landing page">
 
 </td>
 <td width="50%">
 
-**Add Cards — search any public problem**
-<img src="docs/screenshots/add-cards.png" alt="Search LeetCode modal with results and premium tags">
+**Card front — full question**
+<img src="docs/screenshots/card-front.png" alt="Flashcard front showing an AI-generated card's question">
 
 </td>
 </tr>
 <tr>
 <td width="50%">
 
-**Card front — full question + testcases**
-<img src="docs/screenshots/card-front.png" alt="Flashcard front showing question, examples, and constraints">
+**Card back — AI-generated code, no comments**
+<img src="docs/screenshots/card-back.png" alt="Flashcard back showing comment-free Gemini-generated code">
 
 </td>
 <td width="50%">
 
-**Card back — syntax-highlighted code**
-<img src="docs/screenshots/card-back.png" alt="Flashcard back showing saved solution code">
+**Add Cards — three judges, Smart Pick**
+<img src="docs/screenshots/add-cards.png" alt="Add Cards modal with LeetCode, Codeforces, HackerRank, and Smart Pick">
 
 </td>
 </tr>
 </table>
 
-<br>
-
-## ▓ Features
-
-- 🔗 **Connect LeetCode with one click** — logs in through a real browser window, no cookie-copying, no password ever touches this app
-- 🔄 **Sync your own accepted submissions** — incremental, only re-fetches what changed, auto-runs right after connecting
-- 🔍 **Search any public LeetCode problem** by title, or **🎲 random** a free one in
-- ✍️ **Manual/paste mode** — hand-write a card from any source
-- 🤖 **Optional AI-generated solutions** via Gemini (bring your own free API key)
-- ✏️ **Inline code editor** on the card back — fill in blanks or fix anything, anytime
-- 🔥 **Streak board** — a contribution-graph-style heatmap + current/longest streak
-- 🎯 **Filter/search** by source (mine/public), difficulty, tag, or title
-- ⌨️ **Keyboard-driven**: `Space` flip · `←/→` navigate · `S` shuffle
-- 🖥️ Fully local — SQLite on disk, servers bound to `127.0.0.1` only
+**Topic Analysis**
+<img src="docs/screenshots/analysis.png" alt="Topic analysis dashboard showing per-topic solve counts">
 
 <br>
 
-## ▓ Quick start
+## Tech Stack
+
+<div align="center">
+
+![Skills](https://skillicons.dev/icons?i=nodejs,express,sqlite,react,ts,vite,git&theme=dark)
+
+</div>
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, DOMPurify, highlight.js |
+| Backend | Node.js, Express, better-sqlite3 |
+| Authentication | Playwright-driven browser login |
+| AI | Google Gemini (`@google/genai`) |
+| Data sources | LeetCode GraphQL, Codeforces REST + web, HackerRank internal REST |
+| Storage | SQLite — single file, `server/flashcards.db` |
+
+<br>
+
+## Quick Start
 
 ```bash
-$ npm install
-$ npm run setup:browser -w server   # one-time, ~150MB Chromium download for login
-$ cp .env.example .env              # add GEMINI_API_KEY here if you want AI solutions
-$ npm run dev
-# server → http://localhost:5174 (loopback only)
-# client → http://localhost:5173
+npm install
+npm run setup:browser -w server   # one-time, ~150MB Chromium download for login
+cp .env.example .env              # add GEMINI_API_KEY here for AI-generated solutions
+npm run dev
+# server -> http://localhost:5174 (loopback only)
+# client -> http://localhost:5173
 ```
 
-Open the client and click **🔗 CONNECT LEETCODE**. A real browser window opens straight to
-LeetCode's own login page — log in exactly like you always do (password, Google, GitHub,
-whatever). The app polls in the background, and the moment you're logged in it grabs the
-session, closes that window, and **kicks off a sync automatically.** No DevTools, no copying
-tokens, and your password never passes through this app — you type it directly into LeetCode's
-real page.
+Open the client and select **Connect LeetCode**. A real browser window opens to LeetCode's
+own login page — log in exactly as usual. Once authenticated, the app captures the session,
+closes the window, and starts a sync automatically.
 
-(Optional) For AI-generated solutions on imported/random public problems, grab a free key at
-https://aistudio.google.com/apikey and drop it into `.env` as `GEMINI_API_KEY`. Without it,
-those cards come in with blank code and an inline editor to fill in yourself.
+LeetCode's login page runs a bot-verification check that can stall indefinitely on a freshly
+launched automated browser session — this is a platform-level limitation, not an application
+bug. If the popup does not complete, use **"Popup not working? Paste cookies manually"** in
+the UI: log into leetcode.com in your normal browser, open DevTools → Application → Cookies,
+and paste the `LEETCODE_SESSION` and `csrftoken` values.
 
-<details>
-<summary><strong>Advanced: manual cookie setup</strong> (if the browser login doesn't work for your setup)</summary>
+For AI-generated solutions, obtain a free key at https://aistudio.google.com/apikey and set
+it as `GEMINI_API_KEY` in `.env`. Without it, imported public problems are created with blank
+code and an inline editor for you to complete.
+
+`.env` is gitignored — treat its contents as credentials.
 
 <br>
 
-Log into leetcode.com → DevTools → Application/Storage → Cookies → `https://leetcode.com`,
-copy `LEETCODE_SESSION` + `csrftoken`, and paste them into `.env`:
-
-```
-LEETCODE_SESSION=...
-LEETCODE_CSRFTOKEN=...
-```
-
-</details>
-
-`.env` is gitignored — these are credentials, treat them like passwords.
-
-<br>
-
-## ▓ Keyboard shortcuts
+## Keyboard Shortcuts
 
 | Key | Action |
 |---|---|
@@ -141,53 +173,59 @@ LEETCODE_CSRFTOKEN=...
 
 <br>
 
-## ▓ How it's built
+## Architecture
 
 ```
-  [ real browser window ]     [ LeetCode GraphQL ]      [ Gemini API ]
-    you log in here              session cookie            optional
-    (Playwright-driven)          + public, no-login
-             \                        |                       |
-              \                       |                       |
-               v                      v                       v
-        [========== server — Express + SQLite ==========]
-                              |
-                              |  REST / JSON, localhost only
-                              v
-        [========== client — React + Vite ==========]
+  real browser window        LeetCode / Codeforces / HackerRank        Gemini API
+   (Playwright-driven)             session cookie / public reads         optional
+             \                              |                              |
+              \                             |                              |
+               v                            v                              v
+        [==================== server -- Express + SQLite ====================]
+                                       |
+                                       |  REST / JSON, localhost only
+                                       v
+        [==================== client -- React + Vite =========================]
 ```
 
-- **`server/`** — Express API + a local SQLite DB. Drives a short-lived, real Chromium window
-  (via Playwright) for login, talks to LeetCode's GraphQL endpoint (authenticated for your own
-  submissions, public/no-login for browsing any problem), and optionally calls Gemini for
-  solution generation.
-- **`client/`** — React + Vite flashcard UI. No secrets live here — everything credentialed
-  goes through the server.
+`server/` runs the Express API and a local SQLite database. It drives a short-lived,
+real Chromium window via Playwright for login, talks to each judge's own API or pages,
+runs the topic-analysis and Smart Pick logic, and optionally calls Gemini for solution
+generation.
+
+`client/` is the React and Vite flashcard interface. No credentials are stored here —
+every authenticated request is routed through the server.
 
 <br>
 
-## ▓ Project structure
+## Project Structure
 
 ```
-leetcodefcs/
+haleeco/
 ├── server/
 │   └── src/
-│       ├── index.js          # Express routes
-│       ├── db.js             # SQLite schema + queries
-│       ├── leetcodeClient.js # GraphQL calls (own submissions + public browsing)
-│       ├── browserLogin.js   # Playwright-driven login, captures the session cookie
-│       ├── aiGenerate.js     # Gemini solution generation
-│       ├── sync.js           # incremental sync of your accepted submissions
+│       ├── index.js            # Express routes
+│       ├── db.js               # SQLite schema and queries
+│       ├── leetcodeClient.js   # GraphQL - own submissions and public browsing
+│       ├── codeforcesClient.js # Codeforces API and statement retrieval
+│       ├── hackerrankClient.js # HackerRank internal REST endpoint
+│       ├── browserLogin.js     # Playwright login and manual-cookie fallback
+│       ├── analysis.js         # topic coverage and weak-topic selection
+│       ├── aiGenerate.js       # Gemini solution generation
+│       ├── sync.js             # incremental sync of accepted submissions
 │       └── util.js
 ├── client/
 │   └── src/
 │       ├── App.tsx
 │       ├── api.ts
 │       └── components/
-│           ├── FlashCard.tsx
+│           ├── LandingPage.tsx
 │           ├── Sidebar.tsx
+│           ├── FlashCard.tsx
+│           ├── AddCardsPanel.tsx
+│           ├── AnalysisView.tsx
 │           ├── StreakBoard.tsx
-│           └── AddCardsPanel.tsx
+│           └── ManualConnect.tsx
 ├── docs/screenshots/
 ├── .env.example
 └── README.md
@@ -195,22 +233,34 @@ leetcodefcs/
 
 <br>
 
-## ▓ Notes
+## Roadmap
 
-- The captured LeetCode session and your Gemini key are real credentials — `.env` is
-  gitignored, never commit it. The LeetCode session will eventually expire; just hit
-  **reconnect** in the sidebar to log in again.
-- Your LeetCode password is typed into LeetCode's own login page inside a real browser
-  window — it never passes through this app's frontend or backend.
-- Both dev servers bind to `127.0.0.1` only — not exposed on your LAN.
-- Data lives entirely in `server/flashcards.db`. Delete it any time to start over.
+Planned directions for further development:
+
+- [ ] Spaced repetition scheduling (SM-2 / Anki-style recall rating)
+- [ ] Hosted public demo deployment
+- [ ] Automated test suite and CI
+- [ ] Timed mock-interview mode with session history
+- [ ] Time/space complexity self-quiz after each card
+- [ ] Company-tagged problem sets
+- [ ] Docker packaging for one-command setup
+- [ ] Automatic commit of solved code to a public GitHub repository
+
+<br>
+
+## Notes
+
+- Your LeetCode session and Gemini key are real credentials. `.env` is gitignored and should
+  never be committed. Sessions expire eventually — reconnect to renew.
+- Your LeetCode password is entered directly into LeetCode's own login page inside a real
+  browser window; it is never processed by this application's frontend or backend.
+- Both development servers bind to `127.0.0.1` only and are not exposed on the local network.
+- All data is stored in `server/flashcards.db`. Delete it at any time to reset.
 
 <br>
 
 <div align="center">
 
-```
-> _
-```
+Built with Node.js, React, and a preference for keeping data local.
 
 </div>

@@ -275,7 +275,7 @@ export default function App() {
                 Next →
               </button>
               <button className="shuffle-btn" onClick={shuffle}>
-                🔀 Shuffle
+                Shuffle
               </button>
             </div>
             <FlashCard

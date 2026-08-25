@@ -134,7 +134,7 @@ export default function FlashCard({ problem, flipped, onFlip, onSaveCode }: Prop
                 rel="noopener noreferrer"
                 onClick={stopFlip}
               >
-                🔗 Solve it ↗
+                Solve it ↗
               </a>
             )}
           </div>
@@ -220,7 +220,7 @@ export default function FlashCard({ problem, flipped, onFlip, onSaveCode }: Prop
                       downloadCode(problem.slug, problem.lang, problem.code);
                     }}
                   >
-                    💾 Save code
+                    Save code
                   </button>
                 )}
               </div>

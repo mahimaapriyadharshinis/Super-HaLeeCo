@@ -77,13 +77,13 @@ export default function Sidebar({
 
       <div className="view-tabs">
         <button className={view === 'deck' ? 'active' : ''} onClick={() => onViewChange('deck')}>
-          🃏 Deck
+          Deck
         </button>
         <button
           className={view === 'analysis' ? 'active' : ''}
           onClick={() => onViewChange('analysis')}
         >
-          📊 Analysis
+          Analysis
         </button>
       </div>
 
@@ -105,7 +105,7 @@ export default function Sidebar({
       ) : (
         <>
           <button className="pixel-btn accent" onClick={onConnect} disabled={loggingIn || offline}>
-            {loggingIn ? 'WAITING FOR LOGIN…' : '🔗 CONNECT LEETCODE'}
+            {loggingIn ? 'WAITING FOR LOGIN…' : 'CONNECT LEETCODE'}
           </button>
           {!offline && <ManualConnect onConnected={onManualConnected} />}
         </>
