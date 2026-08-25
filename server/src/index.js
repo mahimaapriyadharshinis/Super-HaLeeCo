@@ -34,7 +34,7 @@ import {
 } from './hackerrankClient.js';
 import { aiEnabled, generateSolution } from './aiGenerate.js';
 import { slugify } from './util.js';
-import { startBrowserLogin, getLoginState } from './browserLogin.js';
+import { startBrowserLogin, getLoginState, updateEnvFile } from './browserLogin.js';
 import { getTopicAnalysis, pickWeakTopic } from './analysis.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -69,6 +69,30 @@ app.post('/api/auth/login', (_req, res) => {
 
 app.get('/api/auth/login/status', (_req, res) => {
   res.json(getLoginState());
+});
+
+// Fallback for when the browser-popup flow can't complete (LeetCode's
+// Cloudflare check reliably stalls on a fresh automated browser profile —
+// this is a known, structural limitation, not a fluke). You paste the two
+// cookie values yourself from a normal logged-in browser tab.
+app.post('/api/auth/manual', async (req, res) => {
+  const { session, csrfToken } = req.body;
+  if (!session || !csrfToken) {
+    return res.status(400).json({ error: 'Both session and csrfToken are required' });
+  }
+  process.env.LEETCODE_SESSION = session;
+  process.env.LEETCODE_CSRFTOKEN = csrfToken;
+  updateEnvFile({ LEETCODE_SESSION: session, LEETCODE_CSRFTOKEN: csrfToken });
+
+  try {
+    const username = await fetchCurrentUsername();
+    if (!username) {
+      return res.status(400).json({ error: 'Those values were saved, but LeetCode says this session is not signed in — double check you copied both values while logged in.' });
+    }
+    res.json({ connected: true, username });
+  } catch (err) {
+    res.status(400).json({ error: `Saved, but couldn't verify it: ${err.message}` });
+  }
 });
 
 app.get('/api/problems', (req, res) => {

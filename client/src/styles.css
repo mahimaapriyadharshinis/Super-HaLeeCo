@@ -225,6 +225,46 @@
   color: var(--easy);
 }
 
+.manual-connect-toggle {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-dim);
+  text-decoration: underline;
+  font-size: 11px;
+  padding: 4px 0;
+  align-self: flex-start;
+}
+
+.manual-connect-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px dashed var(--neon-dim);
+  padding: 10px;
+}
+
+.manual-connect-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.manual-connect-form input {
+  width: 100%;
+  padding: 7px 8px;
+  border: 2px solid var(--neon-dim);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.manual-connect-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .sync-message {
   font-size: 11px;
   color: var(--text-dim);

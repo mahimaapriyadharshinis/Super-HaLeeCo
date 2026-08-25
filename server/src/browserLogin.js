@@ -13,7 +13,7 @@ export function getLoginState() {
   return state;
 }
 
-function updateEnvFile(updates) {
+export function updateEnvFile(updates) {
   let content = '';
   try {
     content = fs.readFileSync(ENV_PATH, 'utf8');

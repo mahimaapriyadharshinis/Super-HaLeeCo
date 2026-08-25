@@ -1,5 +1,6 @@
 import type { ProblemSummary, ActivityData, AuthStatus, LoginState } from '../api';
 import StreakBoard from './StreakBoard';
+import ManualConnect from './ManualConnect';
 
 interface Props {
   collapsed: boolean;
@@ -26,6 +27,7 @@ interface Props {
   onAddCards: () => void;
   onConnect: () => void;
   onViewChange: (v: 'deck' | 'analysis') => void;
+  onManualConnected: (auth: AuthStatus) => void;
 }
 
 const DIFFICULTIES = ['', 'Easy', 'Medium', 'Hard'];
@@ -62,6 +64,7 @@ export default function Sidebar({
   onAddCards,
   onConnect,
   onViewChange,
+  onManualConnected,
 }: Props) {
   const connected = !!authStatus?.connected;
   const loggingIn = loginState?.status === 'waiting';
@@ -100,9 +103,12 @@ export default function Sidebar({
           </button>
         </div>
       ) : (
-        <button className="pixel-btn accent" onClick={onConnect} disabled={loggingIn || offline}>
-          {loggingIn ? 'WAITING FOR LOGIN…' : '🔗 CONNECT LEETCODE'}
-        </button>
+        <>
+          <button className="pixel-btn accent" onClick={onConnect} disabled={loggingIn || offline}>
+            {loggingIn ? 'WAITING FOR LOGIN…' : '🔗 CONNECT LEETCODE'}
+          </button>
+          {!offline && <ManualConnect onConnected={onManualConnected} />}
+        </>
       )}
       {loginState && loginState.status !== 'idle' && (
         <div className={`login-message login-${loginState.status}`}>{loginState.message}</div>

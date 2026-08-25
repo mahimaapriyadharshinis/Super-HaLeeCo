@@ -192,6 +192,14 @@ export function fetchLoginStatus() {
   return fetch('/api/auth/login/status').then((r) => json<LoginState>(r));
 }
 
+export function submitManualLogin(session: string, csrfToken: string) {
+  return fetch('/api/auth/manual', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ session, csrfToken }),
+  }).then((r) => json<AuthStatus>(r));
+}
+
 export function fetchActivity() {
   return fetch('/api/activity').then((r) => json<ActivityData>(r));
 }

@@ -1,13 +1,21 @@
 import type { AuthStatus, LoginState } from '../api';
+import ManualConnect from './ManualConnect';
 
 interface Props {
   authStatus: AuthStatus | null;
   loginState: LoginState | null;
   onConnect: () => void;
   onContinue: () => void;
+  onManualConnected: (auth: AuthStatus) => void;
 }
 
-export default function LandingPage({ authStatus, loginState, onConnect, onContinue }: Props) {
+export default function LandingPage({
+  authStatus,
+  loginState,
+  onConnect,
+  onContinue,
+  onManualConnected,
+}: Props) {
   const connected = !!authStatus?.connected;
   const loggingIn = loginState?.status === 'waiting';
 
@@ -37,6 +45,7 @@ export default function LandingPage({ authStatus, loginState, onConnect, onConti
               {loginState && loginState.status !== 'idle' && (
                 <div className={`login-message login-${loginState.status}`}>{loginState.message}</div>
               )}
+              <ManualConnect onConnected={onManualConnected} />
               <button className="pixel-btn ghost landing-skip" onClick={onContinue}>
                 Continue without connecting →
               </button>

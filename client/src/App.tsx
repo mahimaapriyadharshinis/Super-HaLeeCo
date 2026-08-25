@@ -159,6 +159,12 @@ export default function App() {
     setLoginState(s);
   }
 
+  function handleManualConnected(auth: AuthStatus) {
+    setAuthStatus(auth);
+    setLoginState({ status: 'idle', message: '' });
+    if (auth.connected) handleSync();
+  }
+
   // While a browser-assisted login is in progress, poll for it to finish,
   // then refresh auth status and auto-sync — this is the "log in and it
   // just syncs" flow instead of manually pasting cookies.
@@ -200,6 +206,7 @@ export default function App() {
         loginState={loginState}
         onConnect={handleConnect}
         onContinue={() => setEntered(true)}
+        onManualConnected={handleManualConnected}
       />
     );
   }
@@ -240,6 +247,7 @@ export default function App() {
         onAddCards={() => setShowAddPanel(true)}
         onConnect={handleConnect}
         onViewChange={setView}
+        onManualConnected={handleManualConnected}
       />
 
       <button
