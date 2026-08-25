@@ -14,6 +14,8 @@ function levelFor(count: number) {
 export default function StreakBoard({ activity }: Props) {
   if (!activity) return null;
 
+  const today = activity.series[activity.series.length - 1];
+
   return (
     <div className="pixel-panel streak-board">
       <div className="streak-header">
@@ -24,12 +26,13 @@ export default function StreakBoard({ activity }: Props) {
           <span className="streak-best">best {activity.longestStreak}d</span>
         </span>
       </div>
+      <div className="streak-points">{today?.points ?? 0} pts today</div>
       <div className="streak-grid">
         {activity.series.map((day) => (
           <span
             key={day.date}
             className={`streak-cell level-${levelFor(day.count)}`}
-            title={`${day.date}: ${day.count} card${day.count === 1 ? '' : 's'}`}
+            title={`${day.date}: ${day.count} card${day.count === 1 ? '' : 's'} · ${day.points} pts`}
           />
         ))}
       </div>

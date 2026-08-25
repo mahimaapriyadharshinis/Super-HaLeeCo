@@ -36,6 +36,13 @@ import { aiEnabled, generateSolution } from './aiGenerate.js';
 import { slugify } from './util.js';
 import { startBrowserLogin, getLoginState, updateEnvFile } from './browserLogin.js';
 import { getTopicAnalysis, pickWeakTopic } from './analysis.js';
+import {
+  getTodaysDailySet,
+  addMoreDailyCards,
+  completeDailyCard,
+  getOrGenerateQuiz,
+  answerQuizQuestion,
+} from './daily.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
@@ -193,6 +200,49 @@ app.get('/api/random', async (req, res) => {
 // Topic coverage across your own solved problems, for the Analysis view.
 app.get('/api/analysis', (_req, res) => {
   res.json(getTopicAnalysis(listSolvedProblems()));
+});
+
+// ---- Today's Work: a daily set of 5 real solves + a completion quiz, ----
+// ---- extendable in +5 batches via "give me more" ----
+
+app.get('/api/daily', (_req, res) => {
+  try {
+    res.json(getTodaysDailySet());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/daily/more', (_req, res) => {
+  try {
+    res.json(addMoreDailyCards());
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/daily/complete', (req, res) => {
+  try {
+    res.json(completeDailyCard(req.body.slug));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/daily/quiz', async (_req, res) => {
+  try {
+    res.json(await getOrGenerateQuiz());
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/daily/quiz/answer', (req, res) => {
+  try {
+    res.json(answerQuizQuestion(req.body.slug, !!req.body.correct));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // Like /api/random, but biased toward important topics you haven't solved

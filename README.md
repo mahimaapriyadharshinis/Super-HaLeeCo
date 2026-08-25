@@ -61,9 +61,16 @@ to the judges themselves, and optionally to Gemini for solution generation.
 - Manual entry for content from any source
 
 **Studying**
+- **Today's Work** — a daily set of 5 real solves picked from a staleness-ordered rotation,
+  guaranteed not to repeat within a 10-day window until your whole solved deck has cycled
+  through; a **Give me more (+5)** button extends the same day's set in further batches
+  whenever you want to keep going
+- A hard, AI-generated multiple-choice quiz on the algorithm and code behind each completed
+  card — one question per card, graded automatically instead of self-reported
 - Topic Analysis — every core DSA topic plotted against how many times you've solved
   something tagged with it, so gaps are visible at a glance
-- Streak tracking with a contribution-graph-style heatmap
+- Streak tracking with a contribution-graph-style heatmap, plus a running points total per
+  day from completed cards and correct quiz answers
 - Inline code editor, one-click code download, and a direct link back to the original problem
 - Full keyboard navigation
 - Offline-aware — reviewing a saved deck needs no internet connection; the app is explicit
@@ -211,7 +218,8 @@ haleeco/
 │       ├── hackerrankClient.js # HackerRank internal REST endpoint
 │       ├── browserLogin.js     # Playwright login and manual-cookie fallback
 │       ├── analysis.js         # topic coverage and weak-topic selection
-│       ├── aiGenerate.js       # Gemini solution generation
+│       ├── aiGenerate.js       # Gemini solution + quiz generation
+│       ├── daily.js            # Today's Work: daily set rotation, quiz batching
 │       ├── sync.js             # incremental sync of accepted submissions
 │       └── util.js
 ├── client/
@@ -222,6 +230,7 @@ haleeco/
 │           ├── LandingPage.tsx
 │           ├── Sidebar.tsx
 │           ├── FlashCard.tsx
+│           ├── DailyWork.tsx
 │           ├── AddCardsPanel.tsx
 │           ├── AnalysisView.tsx
 │           ├── StreakBoard.tsx
@@ -237,11 +246,11 @@ haleeco/
 
 Planned directions for further development:
 
-- [ ] Spaced repetition scheduling (SM-2 / Anki-style recall rating)
+- [ ] True spaced repetition scheduling (SM-2 / Anki-style recall rating) beyond the current
+  staleness-ordered rotation
 - [ ] Hosted public demo deployment
 - [ ] Automated test suite and CI
 - [ ] Timed mock-interview mode with session history
-- [ ] Time/space complexity self-quiz after each card
 - [ ] Company-tagged problem sets
 - [ ] Docker packaging for one-command setup
 - [ ] Automatic commit of solved code to a public GitHub repository

@@ -30,7 +30,21 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS activity (
     date TEXT PRIMARY KEY,
-    count INTEGER NOT NULL DEFAULT 0
+    count INTEGER NOT NULL DEFAULT 0,
+    points INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS card_reviews (
+    slug TEXT PRIMARY KEY,
+    last_reviewed_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS daily_sets (
+    date TEXT PRIMARY KEY,
+    slugs TEXT NOT NULL,
+    completed_slugs TEXT NOT NULL DEFAULT '[]',
+    quiz TEXT,
+    quiz_results TEXT NOT NULL DEFAULT '{}'
   );
 `);
 
@@ -46,6 +60,11 @@ if (!problemColumns.includes('source_url')) {
   db.exec(
     "UPDATE problems SET source_url = 'https://leetcode.com/problems/' || slug || '/' WHERE platform = 'leetcode' AND question_id IS NOT NULL"
   );
+}
+
+const activityColumns = db.prepare('PRAGMA table_info(activity)').all().map((c) => c.name);
+if (!activityColumns.includes('points')) {
+  db.exec('ALTER TABLE activity ADD COLUMN points INTEGER NOT NULL DEFAULT 0');
 }
 
 export function upsertProblem(problem) {
@@ -182,7 +201,7 @@ export function allTags() {
   return [...set].sort();
 }
 
-function todayStr() {
+export function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
@@ -194,16 +213,24 @@ export function pingActivity() {
   ).run(date);
 }
 
+export function addPoints(date, amount) {
+  db.prepare(
+    `INSERT INTO activity (date, count, points) VALUES (?, 0, ?)
+     ON CONFLICT(date) DO UPDATE SET points = points + excluded.points`
+  ).run(date, amount);
+}
+
 export function getActivity(days = 140) {
-  const rows = db.prepare('SELECT date, count FROM activity ORDER BY date DESC LIMIT ?').all(days);
-  const byDate = new Map(rows.map((r) => [r.date, r.count]));
+  const rows = db.prepare('SELECT date, count, points FROM activity ORDER BY date DESC LIMIT ?').all(days);
+  const byDate = new Map(rows.map((r) => [r.date, { count: r.count, points: r.points }]));
 
   // Build the full day-by-day series (including zero days) for the heatmap.
   const series = [];
   const cursor = new Date();
   for (let i = 0; i < days; i++) {
     const d = cursor.toISOString().slice(0, 10);
-    series.push({ date: d, count: byDate.get(d) ?? 0 });
+    const entry = byDate.get(d);
+    series.push({ date: d, count: entry?.count ?? 0, points: entry?.points ?? 0 });
     cursor.setDate(cursor.getDate() - 1);
   }
   series.reverse();
@@ -234,4 +261,77 @@ export function getActivity(days = 140) {
   }
 
   return { series, currentStreak, longestStreak };
+}
+
+// ---- Card review history (drives Today's Work rotation) ----
+
+export function getCardReviewMap() {
+  const rows = db.prepare('SELECT slug, last_reviewed_at FROM card_reviews').all();
+  return new Map(rows.map((r) => [r.slug, r.last_reviewed_at]));
+}
+
+export function touchCardReview(slug, date) {
+  db.prepare(
+    `INSERT INTO card_reviews (slug, last_reviewed_at) VALUES (?, ?)
+     ON CONFLICT(slug) DO UPDATE SET last_reviewed_at = excluded.last_reviewed_at`
+  ).run(slug, date);
+}
+
+// ---- Today's Work ----
+
+export function getDailySet(date) {
+  const row = db.prepare('SELECT * FROM daily_sets WHERE date = ?').get(date);
+  if (!row) return null;
+  return {
+    date: row.date,
+    slugs: JSON.parse(row.slugs),
+    completedSlugs: JSON.parse(row.completed_slugs),
+    quiz: row.quiz ? JSON.parse(row.quiz) : null,
+    quizResults: JSON.parse(row.quiz_results),
+  };
+}
+
+export function saveDailySet(date, slugs) {
+  db.prepare(
+    `INSERT INTO daily_sets (date, slugs, completed_slugs, quiz, quiz_results)
+     VALUES (?, ?, '[]', NULL, '{}')
+     ON CONFLICT(date) DO NOTHING`
+  ).run(date, JSON.stringify(slugs));
+  return getDailySet(date);
+}
+
+export function appendDailySlugs(date, newSlugs) {
+  const set = getDailySet(date);
+  if (!set) return null;
+  const merged = [...set.slugs, ...newSlugs];
+  db.prepare('UPDATE daily_sets SET slugs = ? WHERE date = ?').run(JSON.stringify(merged), date);
+  return getDailySet(date);
+}
+
+export function markDailyCardComplete(date, slug) {
+  const set = getDailySet(date);
+  if (!set) return null;
+  if (!set.completedSlugs.includes(slug)) {
+    set.completedSlugs.push(slug);
+    db.prepare('UPDATE daily_sets SET completed_slugs = ? WHERE date = ?').run(
+      JSON.stringify(set.completedSlugs),
+      date
+    );
+  }
+  return getDailySet(date);
+}
+
+export function saveDailyQuiz(date, quiz) {
+  db.prepare('UPDATE daily_sets SET quiz = ? WHERE date = ?').run(JSON.stringify(quiz), date);
+}
+
+export function saveDailyQuizAnswer(date, slug, correct) {
+  const set = getDailySet(date);
+  if (!set) return null;
+  set.quizResults[slug] = correct;
+  db.prepare('UPDATE daily_sets SET quiz_results = ? WHERE date = ?').run(
+    JSON.stringify(set.quizResults),
+    date
+  );
+  return getDailySet(date);
 }

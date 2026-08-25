@@ -66,6 +66,7 @@ export interface TopicAnalysis {
 export interface ActivityDay {
   date: string;
   count: number;
+  points: number;
 }
 
 export interface ActivityData {
@@ -211,4 +212,50 @@ export function fetchAnalysis() {
 export function fetchSmartPick(platform: Platform) {
   const search = new URLSearchParams({ platform });
   return fetch(`/api/smart-pick?${search}`).then((r) => json<RandomResult>(r));
+}
+
+export interface DailySet {
+  date: string;
+  slugs: string[];
+  completedSlugs: string[];
+  quiz: QuizItem[] | null;
+  quizResults: Record<string, boolean>;
+  cards: ProblemDetail[];
+}
+
+export interface QuizItem {
+  slug: string;
+  title: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export function fetchDailySet() {
+  return fetch('/api/daily').then((r) => json<DailySet>(r));
+}
+
+export function addMoreDailyCards() {
+  return fetch('/api/daily/more', { method: 'POST' }).then((r) => json<DailySet>(r));
+}
+
+export function completeDailyCard(slug: string) {
+  return fetch('/api/daily/complete', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  }).then((r) => json<DailySet>(r));
+}
+
+export function fetchDailyQuiz() {
+  return fetch('/api/daily/quiz').then((r) => json<QuizItem[]>(r));
+}
+
+export function answerDailyQuiz(slug: string, correct: boolean) {
+  return fetch('/api/daily/quiz/answer', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ slug, correct }),
+  }).then((r) => json<DailySet>(r));
 }

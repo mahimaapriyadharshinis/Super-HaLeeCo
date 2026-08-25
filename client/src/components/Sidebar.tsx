@@ -4,7 +4,7 @@ import ManualConnect from './ManualConnect';
 
 interface Props {
   collapsed: boolean;
-  view: 'deck' | 'analysis';
+  view: 'deck' | 'analysis' | 'daily';
   problems: ProblemSummary[];
   tags: string[];
   search: string;
@@ -26,7 +26,7 @@ interface Props {
   onSync: () => void;
   onAddCards: () => void;
   onConnect: () => void;
-  onViewChange: (v: 'deck' | 'analysis') => void;
+  onViewChange: (v: 'deck' | 'analysis' | 'daily') => void;
   onManualConnected: (auth: AuthStatus) => void;
 }
 
@@ -78,6 +78,9 @@ export default function Sidebar({
       <div className="view-tabs">
         <button className={view === 'deck' ? 'active' : ''} onClick={() => onViewChange('deck')}>
           Deck
+        </button>
+        <button className={view === 'daily' ? 'active' : ''} onClick={() => onViewChange('daily')}>
+          Today's Work
         </button>
         <button
           className={view === 'analysis' ? 'active' : ''}
