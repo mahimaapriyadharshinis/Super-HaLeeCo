@@ -633,6 +633,26 @@ select:focus {
   color: var(--text-dim);
 }
 
+.company-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.company-chip {
+  background: rgba(255, 210, 63, 0.08);
+  border: 1px solid rgba(255, 210, 63, 0.4);
+  padding: 3px 9px;
+  font-size: 10px;
+  color: var(--medium);
+}
+
+.company-chip-more {
+  opacity: 0.7;
+  font-style: italic;
+}
+
 .solve-it-link {
   margin-left: auto;
   background: var(--panel-2);

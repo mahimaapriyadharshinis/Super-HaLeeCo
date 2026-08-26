@@ -138,6 +138,20 @@ export default function FlashCard({ problem, flipped, onFlip, onSaveCode }: Prop
               </a>
             )}
           </div>
+          {problem.companies.length > 0 && (
+            <div className="company-row">
+              {problem.companies.slice(0, 8).map((c) => (
+                <span key={c} className="company-chip">
+                  {c}
+                </span>
+              ))}
+              {problem.companies.length > 8 && (
+                <span className="company-chip company-chip-more">
+                  +{problem.companies.length - 8} more
+                </span>
+              )}
+            </div>
+          )}
           <div className="problem-content" dangerouslySetInnerHTML={{ __html: cleanHtml }} />
           <div className="flip-hint">Click card or press space to reveal the code →</div>
         </div>
