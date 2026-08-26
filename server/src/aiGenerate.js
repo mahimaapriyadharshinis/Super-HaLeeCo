@@ -1,5 +1,12 @@
 import { GoogleGenAI } from '@google/genai';
 
+// gemini-2.5-flash's free-tier daily quota is throttled down to as little as
+// 20 requests/day on many accounts, and gemini-2.0-flash / gemini-2.5-flash-lite
+// have since been retired for accounts created after their cutoff. Quota
+// buckets are per-model, so gemini-3.5-flash-lite (a current, separate bucket)
+// is used instead — verified live against this project's actual API key.
+const MODEL = 'gemini-3.5-flash-lite';
+
 let client = null;
 export function aiEnabled() {
   return !!process.env.GEMINI_API_KEY;
@@ -8,6 +15,18 @@ export function aiEnabled() {
 function getClient() {
   if (!client) client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   return client;
+}
+
+// The SDK's error message is the raw API error body (a huge JSON blob) —
+// not something to show a user. Translate the common, actionable case.
+function friendlyAiError(err) {
+  const raw = err?.message ?? String(err);
+  if (raw.includes('RESOURCE_EXHAUSTED') || raw.includes('"code":429') || /quota/i.test(raw)) {
+    return new Error(
+      `Gemini's free daily quota for ${MODEL} is used up for now. Wait for it to reset, or set a different GEMINI_API_KEY in .env.`
+    );
+  }
+  return err instanceof Error ? err : new Error(raw);
 }
 
 function htmlToText(html) {
@@ -56,29 +75,33 @@ export async function generateSolution({ title, contentHtml, difficulty, languag
   const prompt = `Problem: ${title} (${difficulty})\n\n${questionText}\n\nWrite a solution in ${language}.`;
 
   const client = getClient();
-  let code = stripFences(
-    (
-      await client.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
+  try {
+    let code = stripFences(
+      (
+        await client.models.generateContent({
+          model: MODEL,
+          contents: prompt,
+          config: { systemInstruction: SYSTEM_INSTRUCTION },
+        })
+      ).text ?? ''
+    );
+
+    // One corrective pass if the model slipped a comment in anyway.
+    if (looksCommented(code)) {
+      const retry = await client.models.generateContent({
+        model: MODEL,
+        contents:
+          `${prompt}\n\nYour previous answer had at least one comment in it:\n\n${code}\n\n` +
+          'Rewrite it with every comment removed. Output only the code.',
         config: { systemInstruction: SYSTEM_INSTRUCTION },
-      })
-    ).text ?? ''
-  );
+      });
+      code = stripFences(retry.text ?? '') || code;
+    }
 
-  // One corrective pass if the model slipped a comment in anyway.
-  if (looksCommented(code)) {
-    const retry = await client.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents:
-        `${prompt}\n\nYour previous answer had at least one comment in it:\n\n${code}\n\n` +
-        'Rewrite it with every comment removed. Output only the code.',
-      config: { systemInstruction: SYSTEM_INSTRUCTION },
-    });
-    code = stripFences(retry.text ?? '') || code;
+    return code;
+  } catch (err) {
+    throw friendlyAiError(err);
   }
-
-  return code;
 }
 
 const QUIZ_SYSTEM_INSTRUCTION =
@@ -101,13 +124,18 @@ export async function generateQuizQuestion({ title, contentHtml, code, lang }) {
     `Problem: ${title}\n\n${questionText}\n\nThe solution, in ${lang}:\n\n${code}\n\n` +
     'Write one hard multiple-choice quiz question about this, following the required format.';
 
-  const response = await getClient().models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: prompt,
-    config: { systemInstruction: QUIZ_SYSTEM_INSTRUCTION },
-  });
+  let text;
+  try {
+    const response = await getClient().models.generateContent({
+      model: MODEL,
+      contents: prompt,
+      config: { systemInstruction: QUIZ_SYSTEM_INSTRUCTION },
+    });
+    text = (response.text ?? '').trim();
+  } catch (err) {
+    throw friendlyAiError(err);
+  }
 
-  const text = (response.text ?? '').trim();
   const match = text.match(
     /QUESTION:\s*([\s\S]*?)\s*A:\s*([\s\S]*?)\s*B:\s*([\s\S]*?)\s*C:\s*([\s\S]*?)\s*D:\s*([\s\S]*?)\s*CORRECT:\s*([ABCD])\s*EXPLANATION:\s*([\s\S]*)/i
   );
