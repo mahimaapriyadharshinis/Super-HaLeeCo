@@ -50,15 +50,6 @@ db.exec(`
     quiz TEXT,
     quiz_results TEXT NOT NULL DEFAULT '{}'
   );
-
-  CREATE TABLE IF NOT EXISTS mock_sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    started_at INTEGER NOT NULL,
-    ended_at INTEGER,
-    duration_minutes INTEGER NOT NULL,
-    slugs TEXT NOT NULL,
-    ratings TEXT NOT NULL DEFAULT '{}'
-  );
 `);
 
 const problemColumns = db.prepare("PRAGMA table_info(problems)").all().map((c) => c.name);
@@ -405,53 +396,5 @@ export function saveDailyQuizAnswer(date, slug, correct) {
     date
   );
   return getDailySet(date);
-}
-
-// ---- Mock interview sessions ----
-
-function hydrateMockSession(row) {
-  if (!row) return null;
-  return {
-    id: row.id,
-    startedAt: row.started_at,
-    endedAt: row.ended_at,
-    durationMinutes: row.duration_minutes,
-    slugs: JSON.parse(row.slugs),
-    ratings: JSON.parse(row.ratings),
-  };
-}
-
-export function createMockSession(durationMinutes, slugs) {
-  const info = db
-    .prepare('INSERT INTO mock_sessions (started_at, duration_minutes, slugs) VALUES (?, ?, ?)')
-    .run(Date.now(), durationMinutes, JSON.stringify(slugs));
-  return getMockSession(info.lastInsertRowid);
-}
-
-export function getMockSession(id) {
-  return hydrateMockSession(db.prepare('SELECT * FROM mock_sessions WHERE id = ?').get(id));
-}
-
-export function finishMockSession(id, endedAt) {
-  db.prepare('UPDATE mock_sessions SET ended_at = ? WHERE id = ?').run(endedAt, id);
-  return getMockSession(id);
-}
-
-export function rateMockSessionProblem(id, slug, rating) {
-  const session = getMockSession(id);
-  if (!session) return null;
-  session.ratings[slug] = rating;
-  db.prepare('UPDATE mock_sessions SET ratings = ? WHERE id = ?').run(
-    JSON.stringify(session.ratings),
-    id
-  );
-  return getMockSession(id);
-}
-
-export function listMockSessions(limit = 20) {
-  return db
-    .prepare('SELECT * FROM mock_sessions ORDER BY started_at DESC LIMIT ?')
-    .all(limit)
-    .map(hydrateMockSession);
 }
 

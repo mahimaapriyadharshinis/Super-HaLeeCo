@@ -63,9 +63,13 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
   const [companyProblems, setCompanyProblems] = useState<CompanyProblem[]>([]);
   const [companyLoading, setCompanyLoading] = useState(false);
   const [companySearch, setCompanySearch] = useState('');
+  const [catalogLoading, setCatalogLoading] = useState(true);
 
   useEffect(() => {
-    fetchCompanyCatalog().then(setCompanyCatalog).catch(() => {});
+    fetchCompanyCatalog()
+      .then(setCompanyCatalog)
+      .catch(() => setError('Failed to load the company list.'))
+      .finally(() => setCatalogLoading(false));
   }, []);
 
   async function loadCompanyProblems(company: string) {
@@ -312,8 +316,11 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
               className="tag-select"
               value={selectedCompany}
               onChange={(e) => loadCompanyProblems(e.target.value)}
+              disabled={catalogLoading}
             >
-              <option value="">Choose a company…</option>
+              <option value="">
+                {catalogLoading ? 'Loading companies…' : 'Choose a company…'}
+              </option>
               {companyCatalog.map((c) => (
                 <option key={c} value={c}>
                   {c}

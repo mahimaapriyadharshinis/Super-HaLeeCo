@@ -77,10 +77,6 @@ to the judges themselves, and optionally to Gemini for solution generation.
 - A hard, AI-generated multiple-choice quiz on the algorithm and code behind each completed
   card — one question per card, graded automatically, and the grade feeds directly back into
   that card's SM-2 schedule
-- Timed mock interviews — pick a duration and a problem count, work through them with the
-  code hidden until time's up or you finish early (a **Solve it ↗** link jumps straight to the
-  real problem page so you actually have somewhere to write code), then self-rate and review
-  against your own saved solution; past sessions are kept in a lightweight history
 - Topic Analysis — every core DSA topic plotted against how many times you've solved
   something tagged with it, so gaps are visible at a glance
 - Streak tracking with a contribution-graph-style heatmap, plus a running points total per
@@ -259,7 +255,6 @@ haleeco/
 │   │   ├── aiGenerate.js       # Gemini solution + quiz generation
 │   │   ├── daily.js            # Today's Work: SM-2 rotation, quiz batching
 │   │   ├── srs.js              # SM-2 spaced-repetition scheduler (pure logic)
-│   │   ├── mock.js             # timed mock-interview sessions
 │   │   ├── sync.js             # incremental sync of accepted submissions
 │   │   └── util.js
 │   └── test/                   # Vitest — srs.js, daily.js
@@ -272,7 +267,6 @@ haleeco/
 │   │       ├── Sidebar.tsx
 │   │       ├── FlashCard.tsx
 │   │       ├── DailyWork.tsx
-│   │       ├── MockInterview.tsx
 │   │       ├── ErrorBoundary.tsx
 │   │       ├── AddCardsPanel.tsx
 │   │       ├── AnalysisView.tsx
@@ -295,7 +289,6 @@ Shipped:
 
 - [x] SM-2 spaced repetition for Today's Work
 - [x] Automated test suite (Vitest) and CI (GitHub Actions)
-- [x] Timed mock-interview mode with session history
 - [x] Company-tagged problem sets, sourced live from a public dataset, with a browse-by-company
   discovery flow
 - [x] Docker packaging with an optional no-login demo-data seed

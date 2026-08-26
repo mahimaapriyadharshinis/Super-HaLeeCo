@@ -301,36 +301,3 @@ export function answerDailyQuiz(slug: string, correct: boolean) {
   }).then((r) => json<DailySet>(r));
 }
 
-export interface MockSession {
-  id: number;
-  startedAt: number;
-  endedAt: number | null;
-  durationMinutes: number;
-  slugs: string[];
-  ratings: Record<string, number>;
-  cards?: ProblemDetail[];
-}
-
-export function startMockSession(durationMinutes: number, count: number) {
-  return fetch('/api/mock/start', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ durationMinutes, count }),
-  }).then((r) => json<MockSession>(r));
-}
-
-export function finishMockSession(id: number) {
-  return fetch(`/api/mock/${id}/finish`, { method: 'POST' }).then((r) => json<MockSession>(r));
-}
-
-export function rateMockSessionProblem(id: number, slug: string, rating: number) {
-  return fetch(`/api/mock/${id}/rate`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ slug, rating }),
-  }).then((r) => json<MockSession>(r));
-}
-
-export function fetchMockHistory() {
-  return fetch('/api/mock/history').then((r) => json<MockSession[]>(r));
-}

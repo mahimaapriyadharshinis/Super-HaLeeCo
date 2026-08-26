@@ -5,7 +5,6 @@ import AddCardsPanel from './components/AddCardsPanel';
 import LandingPage from './components/LandingPage';
 import AnalysisView from './components/AnalysisView';
 import DailyWork from './components/DailyWork';
-import MockInterview from './components/MockInterview';
 import ErrorBoundary from './components/ErrorBoundary';
 import {
   fetchProblems,
@@ -52,7 +51,7 @@ export default function App() {
   const [loginState, setLoginState] = useState<LoginState | null>(null);
   const [offline, setOffline] = useState(!navigator.onLine);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [view, setView] = useState<'deck' | 'analysis' | 'daily' | 'mock'>('deck');
+  const [view, setView] = useState<'deck' | 'analysis' | 'daily'>('deck');
 
   // Reviewing an already-synced/added deck needs zero internet access — only
   // Connect/Sync/Add Cards/AI talk to anything outside localhost. Surface
@@ -302,8 +301,6 @@ export default function App() {
             <AnalysisView />
           ) : view === 'daily' ? (
             <DailyWork />
-          ) : view === 'mock' ? (
-            <MockInterview />
           ) : current ? (
             <>
               <div className="deck-controls">

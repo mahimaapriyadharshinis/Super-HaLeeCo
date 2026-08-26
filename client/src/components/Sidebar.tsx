@@ -2,7 +2,7 @@ import type { ProblemSummary, ActivityData, AuthStatus, LoginState } from '../ap
 import StreakBoard from './StreakBoard';
 import ManualConnect from './ManualConnect';
 
-type View = 'deck' | 'analysis' | 'daily' | 'mock';
+type View = 'deck' | 'analysis' | 'daily';
 
 interface Props {
   collapsed: boolean;
@@ -95,9 +95,6 @@ export default function Sidebar({
         </button>
         <button className={view === 'daily' ? 'active' : ''} onClick={() => onViewChange('daily')}>
           Today's Work
-        </button>
-        <button className={view === 'mock' ? 'active' : ''} onClick={() => onViewChange('mock')}>
-          Mock
         </button>
         <button
           className={view === 'analysis' ? 'active' : ''}

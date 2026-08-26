@@ -19,12 +19,6 @@ import {
   getAllLeetCodeSlugs,
 } from './db.js';
 import { buildCompanySlugMap, listCompanyCatalog, fetchCompanyProblems } from './companyTagsClient.js';
-import {
-  startMockSession,
-  finishMockSession,
-  rateMockSessionProblem,
-  getMockHistory,
-} from './mock.js';
 import { runSync } from './sync.js';
 import {
   searchPublicQuestions,
@@ -304,38 +298,6 @@ app.get('/api/daily/quiz', async (_req, res) => {
 app.post('/api/daily/quiz/answer', (req, res) => {
   try {
     res.json(answerQuizQuestion(req.body.slug, !!req.body.correct));
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// ---- Timed mock interviews: N random solved problems, code hidden until you finish ----
-
-app.post('/api/mock/start', (req, res) => {
-  try {
-    const durationMinutes = Number(req.body?.durationMinutes) || 30;
-    const count = Number(req.body?.count) || 2;
-    res.json(startMockSession(durationMinutes, count));
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-app.get('/api/mock/history', (_req, res) => {
-  res.json(getMockHistory(20));
-});
-
-app.post('/api/mock/:id/finish', (req, res) => {
-  try {
-    res.json(finishMockSession(Number(req.params.id)));
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-app.post('/api/mock/:id/rate', (req, res) => {
-  try {
-    res.json(rateMockSessionProblem(Number(req.params.id), req.body.slug, Number(req.body.rating)));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
