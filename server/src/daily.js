@@ -1,7 +1,7 @@
 import {
   listSolvedProblems,
-  getCardReviewMap,
-  touchCardReview,
+  getCardSrsMap,
+  updateCardSrs,
   getDailySet,
   saveDailySet,
   appendDailySlugs,
@@ -13,55 +13,44 @@ import {
   getProblem,
 } from './db.js';
 import { generateQuizQuestion } from './aiGenerate.js';
+import { applySm2 } from './srs.js';
 
 const DAILY_SIZE = 5;
 const EXTRA_BATCH_SIZE = 5;
-const NO_REPEAT_DAYS = 10;
 const POINTS_PER_CARD = 1;
 const POINTS_PER_CORRECT_ANSWER = 2;
 
-function daysBetween(dateStr, today) {
-  return Math.round((new Date(today) - new Date(dateStr)) / 86400000);
-}
-
-// Picks `count` of your real solved problems, prioritizing whichever ones
-// haven't been reviewed in the longest time (never-reviewed first), and
-// excluding anything in `excludeSlugs` (so a same-day "give me more" batch
-// never repeats a card you've already been given today). This is what
-// guarantees both "nothing repeats inside a 10-day window" and "the whole
-// solved deck eventually cycles through" — a simple staleness-ordered
-// rotation rather than true spaced repetition, with a little randomness
-// mixed in so the order isn't perfectly predictable.
+// Picks `count` of your real solved problems for review, using SM-2 due
+// dates: cards that are due (or have never been reviewed) come first,
+// ordered most-overdue-first; if fewer than `count` are actually due yet,
+// the remainder is filled from whatever's soonest-due so Today's Work always
+// has a full set to work through. `excludeSlugs` keeps a same-day "give me
+// more" batch from repeating a card already handed out today.
 function pickDailySlugs(excludeSlugs = [], count = DAILY_SIZE) {
   const solved = listSolvedProblems().filter((p) => !excludeSlugs.includes(p.slug));
-  const reviewMap = getCardReviewMap();
+  const srsMap = getCardSrsMap();
   const today = todayStr();
 
-  const eligible = solved.filter((p) => {
-    const last = reviewMap.get(p.slug);
-    return !last || daysBetween(last, today) >= NO_REPEAT_DAYS;
+  const withDueDate = solved.map((p) => ({ slug: p.slug, dueDate: srsMap.get(p.slug)?.dueDate ?? null }));
+  withDueDate.sort((a, b) => {
+    if (a.dueDate === b.dueDate) return 0;
+    if (a.dueDate === null) return -1;
+    if (b.dueDate === null) return 1;
+    return a.dueDate < b.dueDate ? -1 : 1;
   });
 
-  // If the whole deck is smaller than the no-repeat window allows, fall back
-  // to the full solved list rather than returning an empty/tiny set.
-  const pool = eligible.length > 0 ? eligible : solved;
+  const due = withDueDate.filter((p) => p.dueDate === null || p.dueDate <= today);
+  const notYetDue = withDueDate.filter((p) => p.dueDate !== null && p.dueDate > today);
 
-  const withStaleness = pool.map((p) => ({ slug: p.slug, last: reviewMap.get(p.slug) ?? null }));
-  withStaleness.sort((a, b) => {
-    if (a.last === b.last) return 0;
-    if (a.last === null) return -1;
-    if (b.last === null) return 1;
-    return a.last < b.last ? -1 : 1;
-  });
-
-  const windowSize = Math.min(withStaleness.length, Math.max(count * 3, 20));
-  const candidates = withStaleness.slice(0, windowSize);
-  for (let i = candidates.length - 1; i > 0; i--) {
+  // Shuffle within the due pool so the order isn't perfectly predictable,
+  // then top up with the soonest not-yet-due cards if the deck doesn't have
+  // enough due today.
+  for (let i = due.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    [due[i], due[j]] = [due[j], due[i]];
   }
 
-  return candidates.slice(0, count).map((c) => c.slug);
+  return [...due, ...notYetDue].slice(0, count).map((c) => c.slug);
 }
 
 function hydrate(set) {
@@ -105,8 +94,16 @@ export function completeDailyCard(slug) {
   const alreadyDone = existing.completedSlugs.includes(slug);
   const updated = markDailyCardComplete(today, slug);
   if (!alreadyDone) {
-    touchCardReview(slug, today);
     addPoints(today, POINTS_PER_CARD);
+    // Cards with no saved code never get a quiz question (nothing to ask
+    // about), so their SM-2 schedule would otherwise never advance past
+    // "always due". Bump it here as a neutral pass; everything else gets
+    // scheduled by its actual quiz answer in answerQuizQuestion instead.
+    const problem = getProblem(slug);
+    if (!problem?.code) {
+      const srsMap = getCardSrsMap();
+      updateCardSrs(slug, applySm2(srsMap.get(slug), true, today), today);
+    }
   }
   return hydrate(updated);
 }
@@ -162,6 +159,10 @@ export function answerQuizQuestion(slug, correct) {
   const alreadyAnswered = Object.prototype.hasOwnProperty.call(before.quizResults, slug);
 
   const updated = saveDailyQuizAnswer(today, slug, correct);
-  if (!alreadyAnswered && correct) addPoints(today, POINTS_PER_CORRECT_ANSWER);
+  if (!alreadyAnswered) {
+    if (correct) addPoints(today, POINTS_PER_CORRECT_ANSWER);
+    const srsMap = getCardSrsMap();
+    updateCardSrs(slug, applySm2(srsMap.get(slug), correct, today), today);
+  }
   return hydrate(updated);
 }

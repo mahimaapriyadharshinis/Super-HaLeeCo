@@ -10,6 +10,8 @@
 ![SQLite](https://img.shields.io/badge/sqlite-local-39FF6A?style=for-the-badge&logo=sqlite&logoColor=39FF6A&labelColor=000000)
 ![Gemini](https://img.shields.io/badge/gemini-optional-39FF6A?style=for-the-badge&logo=googlegemini&logoColor=39FF6A&labelColor=000000)
 ![Playwright](https://img.shields.io/badge/playwright-login-39FF6A?style=for-the-badge&logo=playwright&logoColor=39FF6A&labelColor=000000)
+![Vitest](https://img.shields.io/badge/vitest-tested-39FF6A?style=for-the-badge&logo=vitest&logoColor=39FF6A&labelColor=000000)
+![Docker](https://img.shields.io/badge/docker-ready-39FF6A?style=for-the-badge&logo=docker&logoColor=39FF6A&labelColor=000000)
 ![License](https://img.shields.io/badge/status-active-39FF6A?style=for-the-badge&labelColor=000000)
 
 A local flashcard deck for coding-interview practice, built across LeetCode, Codeforces, and
@@ -56,17 +58,24 @@ to the judges themselves, and optionally to Gemini for solution generation.
 - Random problem pull from LeetCode, Codeforces, or HackerRank
 - Smart Pick — same three judges, biased toward an important topic you're weak on or haven't
   attempted, instead of a uniform random choice
+- Company tags — a one-click sync tags every LeetCode problem in your deck with which real
+  companies have asked it (sourced live from a public community dataset, never bundled into
+  this repo), filterable from the sidebar like any other facet
 - Optional AI-generated solutions via Gemini, comment-free by default, with an automatic
   self-correction pass if the model adds one anyway
 - Manual entry for content from any source
 
 **Studying**
-- **Today's Work** — a daily set of 5 real solves picked from a staleness-ordered rotation,
-  guaranteed not to repeat within a 10-day window until your whole solved deck has cycled
-  through; a **Give me more (+5)** button extends the same day's set in further batches
+- **Today's Work** — a daily set of 5 real solves, scheduled by an actual SM-2 spaced-repetition
+  algorithm: cards you get right come back further and further apart, cards you get wrong come
+  back sooner, and a **Give me more (+5)** button extends the same day's set in further batches
   whenever you want to keep going
 - A hard, AI-generated multiple-choice quiz on the algorithm and code behind each completed
-  card — one question per card, graded automatically instead of self-reported
+  card — one question per card, graded automatically, and the grade feeds directly back into
+  that card's SM-2 schedule
+- Timed mock interviews — pick a duration and a problem count, work through them with the
+  code hidden until time's up or you finish early, then self-rate and review against your own
+  saved solution; past sessions are kept in a lightweight history
 - Topic Analysis — every core DSA topic plotted against how many times you've solved
   something tagged with it, so gaps are visible at a glance
 - Streak tracking with a contribution-graph-style heatmap, plus a running points total per
@@ -78,8 +87,13 @@ to the judges themselves, and optionally to Gemini for solution generation.
 
 **Engineering**
 - Fully local: SQLite on disk, both dev servers bound to loopback only
-- Filterable by source, difficulty, tag, or title across the entire deck
+- Filterable by source, difficulty, tag, company, or title across the entire deck
+- Export your whole deck to a JSON file and re-import it elsewhere — a real backup, not just
+  a data dump
 - Collapsible sidebar layout
+- Automated tests (Vitest, backend logic + frontend components) and CI on every push
+- Optional single-container Docker deploy with a no-login demo-data seed — see
+  [DEPLOY.md](DEPLOY.md)
 
 <br>
 
@@ -135,8 +149,10 @@ to the judges themselves, and optionally to Gemini for solution generation.
 | Backend | Node.js, Express, better-sqlite3 |
 | Authentication | Playwright-driven browser login |
 | AI | Google Gemini (`@google/genai`) |
-| Data sources | LeetCode GraphQL, Codeforces REST + web, HackerRank internal REST |
+| Data sources | LeetCode GraphQL, Codeforces REST + web, HackerRank internal REST, a public company-tag dataset fetched live |
 | Storage | SQLite — single file, `server/flashcards.db` |
+| Testing | Vitest + Testing Library (client and server), GitHub Actions CI |
+| Deployment | Docker (multi-stage build), optional demo-data seed — see [DEPLOY.md](DEPLOY.md) |
 
 <br>
 
@@ -166,6 +182,22 @@ it as `GEMINI_API_KEY` in `.env`. Without it, imported public problems are creat
 code and an inline editor for you to complete.
 
 `.env` is gitignored — treat its contents as credentials.
+
+Want to try it without any of the above? See [DEPLOY.md](DEPLOY.md) for a
+one-command Docker build that seeds a small no-login demo deck instead.
+
+<br>
+
+## Testing
+
+```bash
+npm test -w server   # SM-2 scheduling, daily-set rotation, points — Vitest
+npm test -w client   # component behavior — Vitest + Testing Library
+```
+
+Both run automatically on every push via GitHub Actions
+([.github/workflows/ci.yml](.github/workflows/ci.yml)), alongside a full
+client type-check and production build.
 
 <br>
 
@@ -210,32 +242,44 @@ every authenticated request is routed through the server.
 ```
 haleeco/
 ├── server/
-│   └── src/
-│       ├── index.js            # Express routes
-│       ├── db.js               # SQLite schema and queries
-│       ├── leetcodeClient.js   # GraphQL - own submissions and public browsing
-│       ├── codeforcesClient.js # Codeforces API and statement retrieval
-│       ├── hackerrankClient.js # HackerRank internal REST endpoint
-│       ├── browserLogin.js     # Playwright login and manual-cookie fallback
-│       ├── analysis.js         # topic coverage and weak-topic selection
-│       ├── aiGenerate.js       # Gemini solution + quiz generation
-│       ├── daily.js            # Today's Work: daily set rotation, quiz batching
-│       ├── sync.js             # incremental sync of accepted submissions
-│       └── util.js
+│   ├── src/
+│   │   ├── index.js            # Express routes
+│   │   ├── db.js               # SQLite schema and queries
+│   │   ├── leetcodeClient.js   # GraphQL - own submissions and public browsing
+│   │   ├── codeforcesClient.js # Codeforces API and statement retrieval
+│   │   ├── hackerrankClient.js # HackerRank internal REST endpoint
+│   │   ├── companyTagsClient.js# live fetch of the public company-tag dataset
+│   │   ├── importProblem.js    # shared public-problem import (route + demo seed)
+│   │   ├── demoSeed.js         # DEMO_MODE no-login sample deck
+│   │   ├── browserLogin.js     # Playwright login and manual-cookie fallback
+│   │   ├── analysis.js         # topic coverage and weak-topic selection
+│   │   ├── aiGenerate.js       # Gemini solution + quiz generation
+│   │   ├── daily.js            # Today's Work: SM-2 rotation, quiz batching
+│   │   ├── srs.js              # SM-2 spaced-repetition scheduler (pure logic)
+│   │   ├── mock.js             # timed mock-interview sessions
+│   │   ├── sync.js             # incremental sync of accepted submissions
+│   │   └── util.js
+│   └── test/                   # Vitest — srs.js, daily.js
 ├── client/
-│   └── src/
-│       ├── App.tsx
-│       ├── api.ts
-│       └── components/
-│           ├── LandingPage.tsx
-│           ├── Sidebar.tsx
-│           ├── FlashCard.tsx
-│           ├── DailyWork.tsx
-│           ├── AddCardsPanel.tsx
-│           ├── AnalysisView.tsx
-│           ├── StreakBoard.tsx
-│           └── ManualConnect.tsx
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── api.ts
+│   │   └── components/
+│   │       ├── LandingPage.tsx
+│   │       ├── Sidebar.tsx
+│   │       ├── FlashCard.tsx
+│   │       ├── DailyWork.tsx
+│   │       ├── MockInterview.tsx
+│   │       ├── ErrorBoundary.tsx
+│   │       ├── AddCardsPanel.tsx
+│   │       ├── AnalysisView.tsx
+│   │       ├── StreakBoard.tsx
+│   │       └── ManualConnect.tsx
+│   └── test/                   # Vitest + Testing Library
+├── .github/workflows/ci.yml
 ├── docs/screenshots/
+├── Dockerfile
+├── DEPLOY.md
 ├── .env.example
 └── README.md
 ```
@@ -244,15 +288,19 @@ haleeco/
 
 ## Roadmap
 
-Planned directions for further development:
+Shipped:
 
-- [ ] True spaced repetition scheduling (SM-2 / Anki-style recall rating) beyond the current
-  staleness-ordered rotation
-- [ ] Hosted public demo deployment
-- [ ] Automated test suite and CI
-- [ ] Timed mock-interview mode with session history
-- [ ] Company-tagged problem sets
-- [ ] Docker packaging for one-command setup
+- [x] SM-2 spaced repetition for Today's Work
+- [x] Automated test suite (Vitest) and CI (GitHub Actions)
+- [x] Timed mock-interview mode with session history
+- [x] Company-tagged problem sets, sourced live from a public dataset
+- [x] Docker packaging with an optional no-login demo-data seed
+- [x] Deck export/import as JSON
+
+Planned:
+
+- [ ] Actually host the public demo somewhere (the Docker image is ready — see
+  [DEPLOY.md](DEPLOY.md) — this just needs a platform account to point at it)
 - [ ] Automatic commit of solved code to a public GitHub repository
 
 <br>

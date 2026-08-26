@@ -11,6 +11,7 @@ export interface ProblemSummary {
   submittedAt: number;
   source: Source;
   platform: Platform | 'manual';
+  companies: string[];
 }
 
 export interface ProblemDetail extends ProblemSummary {
@@ -106,13 +107,29 @@ export function fetchProblems(params: {
   tag?: string;
   q?: string;
   source?: 'own' | 'public' | '';
+  company?: string;
 }) {
   const search = new URLSearchParams();
   if (params.difficulty) search.set('difficulty', params.difficulty);
   if (params.tag) search.set('tag', params.tag);
   if (params.q) search.set('q', params.q);
   if (params.source) search.set('source', params.source);
+  if (params.company) search.set('company', params.company);
   return fetch(`/api/problems?${search}`).then((r) => json<ProblemSummary[]>(r));
+}
+
+export function fetchCompanies() {
+  return fetch('/api/companies').then((r) => json<string[]>(r));
+}
+
+export interface CompanySyncResult {
+  tagged: number;
+  totalChecked: number;
+  companiesFound: number;
+}
+
+export function syncCompanyTags() {
+  return fetch('/api/companies/sync', { method: 'POST' }).then((r) => json<CompanySyncResult>(r));
 }
 
 export function fetchTags() {
@@ -258,4 +275,61 @@ export function answerDailyQuiz(slug: string, correct: boolean) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ slug, correct }),
   }).then((r) => json<DailySet>(r));
+}
+
+export interface DeckExport {
+  exportedAt: number;
+  version: number;
+  problems: ProblemDetail[];
+}
+
+export function exportDeck() {
+  return fetch('/api/export').then((r) => json<DeckExport>(r));
+}
+
+export interface ImportResult {
+  imported: number;
+  skipped: number;
+}
+
+export function importDeck(payload: DeckExport) {
+  return fetch('/api/import', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then((r) => json<ImportResult>(r));
+}
+
+export interface MockSession {
+  id: number;
+  startedAt: number;
+  endedAt: number | null;
+  durationMinutes: number;
+  slugs: string[];
+  ratings: Record<string, number>;
+  cards?: ProblemDetail[];
+}
+
+export function startMockSession(durationMinutes: number, count: number) {
+  return fetch('/api/mock/start', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ durationMinutes, count }),
+  }).then((r) => json<MockSession>(r));
+}
+
+export function finishMockSession(id: number) {
+  return fetch(`/api/mock/${id}/finish`, { method: 'POST' }).then((r) => json<MockSession>(r));
+}
+
+export function rateMockSessionProblem(id: number, slug: string, rating: number) {
+  return fetch(`/api/mock/${id}/rate`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ slug, rating }),
+  }).then((r) => json<MockSession>(r));
+}
+
+export function fetchMockHistory() {
+  return fetch('/api/mock/history').then((r) => json<MockSession[]>(r));
 }

@@ -2,18 +2,24 @@ import type { ProblemSummary, ActivityData, AuthStatus, LoginState } from '../ap
 import StreakBoard from './StreakBoard';
 import ManualConnect from './ManualConnect';
 
+type View = 'deck' | 'analysis' | 'daily' | 'mock';
+
 interface Props {
   collapsed: boolean;
-  view: 'deck' | 'analysis' | 'daily';
+  view: View;
   problems: ProblemSummary[];
   tags: string[];
+  companies: string[];
   search: string;
   difficulty: string;
   tag: string;
+  companyFilter: string;
   sourceFilter: 'own' | 'public' | '';
   currentSlug: string | undefined;
   syncStatus: 'idle' | 'running' | 'done' | 'error';
   syncMessage: string;
+  companySyncStatus: 'idle' | 'running' | 'done' | 'error';
+  companySyncMessage: string;
   activity: ActivityData | null;
   authStatus: AuthStatus | null;
   loginState: LoginState | null;
@@ -21,13 +27,17 @@ interface Props {
   onSearchChange: (v: string) => void;
   onDifficultyChange: (v: string) => void;
   onTagChange: (v: string) => void;
+  onCompanyFilterChange: (v: string) => void;
   onSourceFilterChange: (v: 'own' | 'public' | '') => void;
   onSelect: (slug: string) => void;
   onSync: () => void;
+  onSyncCompanies: () => void;
   onAddCards: () => void;
   onConnect: () => void;
-  onViewChange: (v: 'deck' | 'analysis' | 'daily') => void;
+  onViewChange: (v: View) => void;
   onManualConnected: (auth: AuthStatus) => void;
+  onExport: () => void;
+  onImport: () => void;
 }
 
 const DIFFICULTIES = ['', 'Easy', 'Medium', 'Hard'];
@@ -44,13 +54,17 @@ export default function Sidebar({
   view,
   problems,
   tags,
+  companies,
   search,
   difficulty,
   tag,
+  companyFilter,
   sourceFilter,
   currentSlug,
   syncStatus,
   syncMessage,
+  companySyncStatus,
+  companySyncMessage,
   activity,
   authStatus,
   loginState,
@@ -58,13 +72,17 @@ export default function Sidebar({
   onSearchChange,
   onDifficultyChange,
   onTagChange,
+  onCompanyFilterChange,
   onSourceFilterChange,
   onSelect,
   onSync,
+  onSyncCompanies,
   onAddCards,
   onConnect,
   onViewChange,
   onManualConnected,
+  onExport,
+  onImport,
 }: Props) {
   const connected = !!authStatus?.connected;
   const loggingIn = loginState?.status === 'waiting';
@@ -81,6 +99,9 @@ export default function Sidebar({
         </button>
         <button className={view === 'daily' ? 'active' : ''} onClick={() => onViewChange('daily')}>
           Today's Work
+        </button>
+        <button className={view === 'mock' ? 'active' : ''} onClick={() => onViewChange('mock')}>
+          Mock
         </button>
         <button
           className={view === 'analysis' ? 'active' : ''}
@@ -131,6 +152,26 @@ export default function Sidebar({
       </div>
       {syncMessage && <div className={`sync-message sync-${syncStatus}`}>{syncMessage}</div>}
 
+      <div className="action-row">
+        <button
+          className="pixel-btn small"
+          onClick={onSyncCompanies}
+          disabled={companySyncStatus === 'running' || offline}
+          title="Tag your deck with which companies have asked each LeetCode problem"
+        >
+          {companySyncStatus === 'running' ? 'TAGGING…' : 'SYNC COMPANIES'}
+        </button>
+        <button className="pixel-btn ghost small" onClick={onExport}>
+          EXPORT
+        </button>
+        <button className="pixel-btn ghost small" onClick={onImport}>
+          IMPORT
+        </button>
+      </div>
+      {companySyncMessage && (
+        <div className={`sync-message sync-${companySyncStatus}`}>{companySyncMessage}</div>
+      )}
+
       <input
         className="search-input"
         placeholder="&gt; search title_"
@@ -167,6 +208,19 @@ export default function Sidebar({
         {tags.map((t) => (
           <option key={t} value={t}>
             {t}
+          </option>
+        ))}
+      </select>
+
+      <select
+        className="tag-select"
+        value={companyFilter}
+        onChange={(e) => onCompanyFilterChange(e.target.value)}
+      >
+        <option value="">All companies</option>
+        {companies.map((c) => (
+          <option key={c} value={c}>
+            {c}
           </option>
         ))}
       </select>

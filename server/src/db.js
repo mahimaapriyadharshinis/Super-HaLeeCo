@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, '..', 'flashcards.db');
+const dbPath = process.env.HALEECO_DB_PATH || path.join(__dirname, '..', 'flashcards.db');
 
 export const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
@@ -36,7 +36,11 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS card_reviews (
     slug TEXT PRIMARY KEY,
-    last_reviewed_at TEXT
+    last_reviewed_at TEXT,
+    ease_factor REAL NOT NULL DEFAULT 2.5,
+    interval_days INTEGER NOT NULL DEFAULT 0,
+    reps INTEGER NOT NULL DEFAULT 0,
+    due_date TEXT
   );
 
   CREATE TABLE IF NOT EXISTS daily_sets (
@@ -45,6 +49,15 @@ db.exec(`
     completed_slugs TEXT NOT NULL DEFAULT '[]',
     quiz TEXT,
     quiz_results TEXT NOT NULL DEFAULT '{}'
+  );
+
+  CREATE TABLE IF NOT EXISTS mock_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER,
+    duration_minutes INTEGER NOT NULL,
+    slugs TEXT NOT NULL,
+    ratings TEXT NOT NULL DEFAULT '{}'
   );
 `);
 
@@ -61,10 +74,23 @@ if (!problemColumns.includes('source_url')) {
     "UPDATE problems SET source_url = 'https://leetcode.com/problems/' || slug || '/' WHERE platform = 'leetcode' AND question_id IS NOT NULL"
   );
 }
+if (!problemColumns.includes('companies')) {
+  db.exec("ALTER TABLE problems ADD COLUMN companies TEXT NOT NULL DEFAULT '[]'");
+}
 
 const activityColumns = db.prepare('PRAGMA table_info(activity)').all().map((c) => c.name);
 if (!activityColumns.includes('points')) {
   db.exec('ALTER TABLE activity ADD COLUMN points INTEGER NOT NULL DEFAULT 0');
+}
+
+const cardReviewColumns = db.prepare('PRAGMA table_info(card_reviews)').all().map((c) => c.name);
+for (const [col, ddl] of [
+  ['ease_factor', 'ALTER TABLE card_reviews ADD COLUMN ease_factor REAL NOT NULL DEFAULT 2.5'],
+  ['interval_days', 'ALTER TABLE card_reviews ADD COLUMN interval_days INTEGER NOT NULL DEFAULT 0'],
+  ['reps', 'ALTER TABLE card_reviews ADD COLUMN reps INTEGER NOT NULL DEFAULT 0'],
+  ['due_date', 'ALTER TABLE card_reviews ADD COLUMN due_date TEXT'],
+]) {
+  if (!cardReviewColumns.includes(col)) db.exec(ddl);
 }
 
 export function upsertProblem(problem) {
@@ -133,8 +159,8 @@ export function slugExists(slug) {
   return !!db.prepare('SELECT 1 FROM problems WHERE slug = ?').get(slug);
 }
 
-export function listProblems({ difficulty, tag, q, source, platform } = {}) {
-  let sql = `SELECT slug, question_id as questionId, title, difficulty, tags, lang, submitted_at as submittedAt, source, platform
+export function listProblems({ difficulty, tag, q, source, platform, company } = {}) {
+  let sql = `SELECT slug, question_id as questionId, title, difficulty, tags, lang, submitted_at as submittedAt, source, platform, companies
              FROM problems WHERE 1=1`;
   const params = [];
   if (difficulty) {
@@ -158,10 +184,15 @@ export function listProblems({ difficulty, tag, q, source, platform } = {}) {
     sql += ' AND platform = ?';
     params.push(platform);
   }
+  if (company) {
+    sql += ' AND companies LIKE ?';
+    params.push(`%"${company}"%`);
+  }
   sql += ' ORDER BY title ASC';
   return db.prepare(sql).all(...params).map((row) => ({
     ...row,
     tags: JSON.parse(row.tags || '[]'),
+    companies: JSON.parse(row.companies || '[]'),
   }));
 }
 
@@ -184,7 +215,28 @@ export function getProblem(slug) {
     source: row.source,
     platform: row.platform,
     sourceUrl: row.source_url,
+    companies: JSON.parse(row.companies || '[]'),
   };
+}
+
+export function setProblemCompanies(slug, companies) {
+  db.prepare('UPDATE problems SET companies = ? WHERE slug = ?').run(JSON.stringify(companies), slug);
+}
+
+export function getAllLeetCodeSlugs() {
+  return db
+    .prepare("SELECT slug FROM problems WHERE platform = 'leetcode'")
+    .all()
+    .map((r) => r.slug);
+}
+
+export function listAllCompanies() {
+  const rows = db.prepare("SELECT companies FROM problems WHERE companies != '[]'").all();
+  const set = new Set();
+  for (const row of rows) {
+    for (const c of JSON.parse(row.companies || '[]')) set.add(c);
+  }
+  return [...set].sort();
 }
 
 export function listSolvedProblems() {
@@ -263,18 +315,37 @@ export function getActivity(days = 140) {
   return { series, currentStreak, longestStreak };
 }
 
-// ---- Card review history (drives Today's Work rotation) ----
+// ---- Card review / SM-2 spaced-repetition state (drives Today's Work rotation) ----
 
-export function getCardReviewMap() {
-  const rows = db.prepare('SELECT slug, last_reviewed_at FROM card_reviews').all();
-  return new Map(rows.map((r) => [r.slug, r.last_reviewed_at]));
+export function getCardSrsMap() {
+  const rows = db
+    .prepare('SELECT slug, last_reviewed_at, ease_factor, interval_days, reps, due_date FROM card_reviews')
+    .all();
+  return new Map(
+    rows.map((r) => [
+      r.slug,
+      {
+        lastReviewedAt: r.last_reviewed_at,
+        easeFactor: r.ease_factor,
+        intervalDays: r.interval_days,
+        reps: r.reps,
+        dueDate: r.due_date,
+      },
+    ])
+  );
 }
 
-export function touchCardReview(slug, date) {
+export function updateCardSrs(slug, srs, date) {
   db.prepare(
-    `INSERT INTO card_reviews (slug, last_reviewed_at) VALUES (?, ?)
-     ON CONFLICT(slug) DO UPDATE SET last_reviewed_at = excluded.last_reviewed_at`
-  ).run(slug, date);
+    `INSERT INTO card_reviews (slug, last_reviewed_at, ease_factor, interval_days, reps, due_date)
+     VALUES (@slug, @date, @easeFactor, @intervalDays, @reps, @dueDate)
+     ON CONFLICT(slug) DO UPDATE SET
+       last_reviewed_at = excluded.last_reviewed_at,
+       ease_factor = excluded.ease_factor,
+       interval_days = excluded.interval_days,
+       reps = excluded.reps,
+       due_date = excluded.due_date`
+  ).run({ slug, date, ...srs });
 }
 
 // ---- Today's Work ----
@@ -334,4 +405,78 @@ export function saveDailyQuizAnswer(date, slug, correct) {
     date
   );
   return getDailySet(date);
+}
+
+// ---- Mock interview sessions ----
+
+function hydrateMockSession(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    durationMinutes: row.duration_minutes,
+    slugs: JSON.parse(row.slugs),
+    ratings: JSON.parse(row.ratings),
+  };
+}
+
+export function createMockSession(durationMinutes, slugs) {
+  const info = db
+    .prepare('INSERT INTO mock_sessions (started_at, duration_minutes, slugs) VALUES (?, ?, ?)')
+    .run(Date.now(), durationMinutes, JSON.stringify(slugs));
+  return getMockSession(info.lastInsertRowid);
+}
+
+export function getMockSession(id) {
+  return hydrateMockSession(db.prepare('SELECT * FROM mock_sessions WHERE id = ?').get(id));
+}
+
+export function finishMockSession(id, endedAt) {
+  db.prepare('UPDATE mock_sessions SET ended_at = ? WHERE id = ?').run(endedAt, id);
+  return getMockSession(id);
+}
+
+export function rateMockSessionProblem(id, slug, rating) {
+  const session = getMockSession(id);
+  if (!session) return null;
+  session.ratings[slug] = rating;
+  db.prepare('UPDATE mock_sessions SET ratings = ? WHERE id = ?').run(
+    JSON.stringify(session.ratings),
+    id
+  );
+  return getMockSession(id);
+}
+
+export function listMockSessions(limit = 20) {
+  return db
+    .prepare('SELECT * FROM mock_sessions ORDER BY started_at DESC LIMIT ?')
+    .all(limit)
+    .map(hydrateMockSession);
+}
+
+// ---- Export / import ----
+
+export function exportAllProblems() {
+  return db
+    .prepare('SELECT * FROM problems')
+    .all()
+    .map((row) => ({
+      slug: row.slug,
+      questionId: row.question_id,
+      title: row.title,
+      difficulty: row.difficulty,
+      tags: JSON.parse(row.tags || '[]'),
+      contentHtml: row.content_html,
+      sampleTestcase: row.sample_testcase,
+      exampleTestcases: row.example_testcases,
+      code: row.code,
+      lang: row.lang,
+      submittedAt: row.submitted_at,
+      syncedAt: row.synced_at,
+      source: row.source,
+      platform: row.platform,
+      sourceUrl: row.source_url,
+      companies: JSON.parse(row.companies || '[]'),
+    }));
 }

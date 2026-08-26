@@ -14,25 +14,32 @@ import {
   pingActivity,
   getActivity,
   listSolvedProblems,
+  exportAllProblems,
+  setProblemCompanies,
+  listAllCompanies,
+  getAllLeetCodeSlugs,
 } from './db.js';
+import { buildCompanySlugMap } from './companyTagsClient.js';
+import {
+  startMockSession,
+  finishMockSession,
+  rateMockSessionProblem,
+  getMockHistory,
+} from './mock.js';
 import { runSync } from './sync.js';
 import {
   searchPublicQuestions,
   fetchRandomPublicQuestion,
-  fetchPublicQuestion,
   fetchCurrentUsername,
   fetchRandomQuestionByTag,
 } from './leetcodeClient.js';
 import {
   fetchRandomCodeforcesProblem,
-  fetchCodeforcesStatement,
   fetchRandomCodeforcesProblemByTopic,
 } from './codeforcesClient.js';
-import {
-  fetchRandomHackerRankChallenge,
-  fetchHackerRankChallengeDetail,
-} from './hackerrankClient.js';
-import { aiEnabled, generateSolution } from './aiGenerate.js';
+import { fetchRandomHackerRankChallenge } from './hackerrankClient.js';
+import { aiEnabled } from './aiGenerate.js';
+import { importPublicProblem } from './importProblem.js';
 import { slugify } from './util.js';
 import { startBrowserLogin, getLoginState, updateEnvFile } from './browserLogin.js';
 import { getTopicAnalysis, pickWeakTopic } from './analysis.js';
@@ -49,7 +56,7 @@ dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 
 app.get('/api/config', (_req, res) => {
   res.json({ aiEnabled: aiEnabled() });
@@ -103,8 +110,83 @@ app.post('/api/auth/manual', async (req, res) => {
 });
 
 app.get('/api/problems', (req, res) => {
-  const { difficulty, tag, q, source } = req.query;
-  res.json(listProblems({ difficulty, tag, q, source }));
+  const { difficulty, tag, q, source, company } = req.query;
+  res.json(listProblems({ difficulty, tag, q, source, company }));
+});
+
+app.get('/api/companies', (_req, res) => {
+  res.json(listAllCompanies());
+});
+
+let companySyncInProgress = false;
+app.post('/api/companies/sync', async (_req, res) => {
+  if (companySyncInProgress) {
+    return res.status(409).json({ error: 'A company-tag sync is already running.' });
+  }
+  companySyncInProgress = true;
+  try {
+    const slugMap = await buildCompanySlugMap();
+    const ourSlugs = getAllLeetCodeSlugs();
+    let tagged = 0;
+    for (const slug of ourSlugs) {
+      const companies = slugMap.get(slug);
+      if (companies && companies.size > 0) {
+        setProblemCompanies(slug, [...companies].sort());
+        tagged++;
+      }
+    }
+    res.json({ tagged, totalChecked: ourSlugs.length, companiesFound: slugMap.size });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  } finally {
+    companySyncInProgress = false;
+  }
+});
+
+app.get('/api/export', (_req, res) => {
+  res.json({ exportedAt: Date.now(), version: 1, problems: exportAllProblems() });
+});
+
+app.post('/api/import', (req, res) => {
+  const incoming = Array.isArray(req.body?.problems) ? req.body.problems : null;
+  if (!incoming) return res.status(400).json({ error: 'Expected { problems: [...] } from a HaLeeCo export.' });
+
+  let imported = 0;
+  let skipped = 0;
+  for (const p of incoming) {
+    if (!p?.slug || !p?.title) {
+      skipped++;
+      continue;
+    }
+    // Never let an import clobber a real solved submission already on disk.
+    const existing = getProblem(p.slug);
+    if (existing && existing.source === 'own') {
+      skipped++;
+      continue;
+    }
+    upsertProblem({
+      slug: p.slug,
+      questionId: p.questionId ?? null,
+      title: p.title,
+      difficulty: p.difficulty ?? null,
+      tags: JSON.stringify(p.tags ?? []),
+      contentHtml: p.contentHtml ?? '',
+      sampleTestcase: p.sampleTestcase ?? '',
+      exampleTestcases: p.exampleTestcases ?? '',
+      code: p.code ?? '',
+      lang: p.lang ?? '',
+      submittedAt: p.submittedAt ?? null,
+      syncedAt: Date.now(),
+      source: p.source === 'own' ? 'manual' : (p.source ?? 'manual'),
+      platform: p.platform ?? 'leetcode',
+      sourceUrl: p.sourceUrl ?? null,
+    });
+    if (Array.isArray(p.companies) && p.companies.length > 0) {
+      setProblemCompanies(p.slug, p.companies);
+    }
+    imported++;
+  }
+  res.json({ imported, skipped });
 });
 
 app.get('/api/tags', (_req, res) => {
@@ -245,6 +327,38 @@ app.post('/api/daily/quiz/answer', (req, res) => {
   }
 });
 
+// ---- Timed mock interviews: N random solved problems, code hidden until you finish ----
+
+app.post('/api/mock/start', (req, res) => {
+  try {
+    const durationMinutes = Number(req.body?.durationMinutes) || 30;
+    const count = Number(req.body?.count) || 2;
+    res.json(startMockSession(durationMinutes, count));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/mock/history', (_req, res) => {
+  res.json(getMockHistory(20));
+});
+
+app.post('/api/mock/:id/finish', (req, res) => {
+  try {
+    res.json(finishMockSession(Number(req.params.id)));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/mock/:id/rate', (req, res) => {
+  try {
+    res.json(rateMockSessionProblem(Number(req.params.id), req.body.slug, Number(req.body.rating)));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Like /api/random, but biased toward important topics you haven't solved
 // (or have solved the least) instead of picking uniformly at random.
 app.get('/api/smart-pick', async (req, res) => {
@@ -305,79 +419,10 @@ app.get('/api/smart-pick', async (req, res) => {
 app.post('/api/problems/import', async (req, res) => {
   const { platform = 'leetcode', id, generateSolution: wantSolution, language } = req.body;
   try {
-    let slug, title, difficulty, tags, contentHtml, sourceUrl, questionId, sampleTestcase, exampleTestcases;
-
-    if (platform === 'leetcode') {
-      const q = await fetchPublicQuestion(id);
-      slug = q.titleSlug;
-      title = q.title;
-      difficulty = q.difficulty;
-      tags = q.topicTags.map((t) => t.name);
-      contentHtml = q.content;
-      sourceUrl = `https://leetcode.com/problems/${q.titleSlug}/`;
-      questionId = q.questionId;
-      sampleTestcase = q.sampleTestCase;
-      exampleTestcases = q.exampleTestcases;
-    } else if (platform === 'codeforces') {
-      const [contestId, index] = id.split(':');
-      const p = await fetchCodeforcesStatement(contestId, index);
-      slug = `cf-${contestId}-${index.toLowerCase()}`;
-      title = `${contestId}${index}. ${p.title}`;
-      difficulty = 'Medium';
-      tags = [];
-      contentHtml = p.contentHtml;
-      sourceUrl = `https://codeforces.com/problemset/problem/${contestId}/${index}`;
-    } else if (platform === 'hackerrank') {
-      const c = await fetchHackerRankChallengeDetail(id);
-      slug = `hr-${c.slug}`;
-      title = c.title;
-      difficulty = c.difficulty;
-      tags = c.category ? [c.category] : [];
-      contentHtml = c.contentHtml;
-      sourceUrl = `https://www.hackerrank.com/challenges/${c.slug}/problem`;
-    } else {
-      return res.status(400).json({ error: `Unknown platform "${platform}"` });
-    }
-
-    // Never let an import clobber a real synced solve of yours that happens
-    // to share the same slug (e.g. re-importing "two-sum" for an AI answer).
-    const existing = getProblem(slug);
-    if (existing && existing.source === 'own') {
-      return res.json(existing);
-    }
-
-    let code = '';
-    let source = 'manual';
-    let lang = language || 'plaintext';
-
-    if (wantSolution) {
-      code = await generateSolution({ title, contentHtml, difficulty, language: language || 'Python' });
-      source = 'ai';
-      lang = language || 'Python';
-    }
-
-    upsertProblem({
-      slug,
-      questionId: questionId ?? null,
-      title,
-      difficulty,
-      tags: JSON.stringify(tags),
-      contentHtml,
-      sampleTestcase: sampleTestcase ?? '',
-      exampleTestcases: exampleTestcases ?? '',
-      code,
-      lang,
-      submissionId: null,
-      submittedAt: Math.floor(Date.now() / 1000),
-      syncedAt: Math.floor(Date.now() / 1000),
-      source,
-      platform,
-      sourceUrl,
-    });
-
-    res.json(getProblem(slug));
+    const problem = await importPublicProblem(platform, id, { wantSolution, language });
+    res.json(problem);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.message?.startsWith('Unknown platform') ? 400 : 500).json({ error: err.message });
   }
 });
 
@@ -428,7 +473,32 @@ app.get('/api/activity', (_req, res) => {
   res.json(getActivity());
 });
 
-const port = process.env.PORT || 5174;
-app.listen(port, '127.0.0.1', () => {
-  console.log(`Server listening on http://localhost:${port}`);
+// In local dev, Vite serves the client separately and only proxies /api/*
+// here — this block is inert then. It only matters for a single-container
+// deploy (Docker/hosted demo), where this same server also serves the
+// already-built client bundle and its SPA routes.
+const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
+app.use(express.static(clientDist));
+app.use((req, res, next) => {
+  if (req.method !== 'GET' || req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(clientDist, 'index.html'), (err) => {
+    if (err) next();
+  });
 });
+
+const port = process.env.PORT || 5174;
+// Bind to loopback only by default (see README) — a hosted deploy sets
+// HOST=0.0.0.0 explicitly so the platform's router can reach the container.
+const host = process.env.HOST || '127.0.0.1';
+
+async function start() {
+  if (process.env.DEMO_MODE === 'true') {
+    const { seedDemoDeck } = await import('./demoSeed.js');
+    await seedDemoDeck().catch((err) => console.error('DEMO_MODE seed failed:', err));
+  }
+  app.listen(port, host, () => {
+    console.log(`Server listening on http://${host}:${port}`);
+  });
+}
+
+start();

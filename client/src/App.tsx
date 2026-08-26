@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import FlashCard from './components/FlashCard';
 import AddCardsPanel from './components/AddCardsPanel';
 import LandingPage from './components/LandingPage';
 import AnalysisView from './components/AnalysisView';
 import DailyWork from './components/DailyWork';
+import MockInterview from './components/MockInterview';
+import ErrorBoundary from './components/ErrorBoundary';
 import {
   fetchProblems,
   fetchTags,
@@ -17,6 +19,10 @@ import {
   fetchAuthStatus,
   startLogin,
   fetchLoginStatus,
+  fetchCompanies,
+  syncCompanyTags,
+  exportDeck,
+  importDeck,
 } from './api';
 import type { ProblemSummary, ProblemDetail, ActivityData, AuthStatus, LoginState } from './api';
 import './styles.css';
@@ -29,6 +35,12 @@ export default function App() {
   const [difficulty, setDifficulty] = useState('');
   const [tag, setTag] = useState('');
   const [sourceFilter, setSourceFilter] = useState<'own' | 'public' | ''>('');
+  const [companyFilter, setCompanyFilter] = useState('');
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [companySyncStatus, setCompanySyncStatus] = useState<'idle' | 'running' | 'done' | 'error'>(
+    'idle'
+  );
+  const [companySyncMessage, setCompanySyncMessage] = useState('');
   const [index, setIndex] = useState(0);
   const [current, setCurrent] = useState<ProblemDetail | null>(null);
   const [flipped, setFlipped] = useState(false);
@@ -42,7 +54,8 @@ export default function App() {
   const [loginState, setLoginState] = useState<LoginState | null>(null);
   const [offline, setOffline] = useState(!navigator.onLine);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [view, setView] = useState<'deck' | 'analysis' | 'daily'>('deck');
+  const [view, setView] = useState<'deck' | 'analysis' | 'daily' | 'mock'>('deck');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reviewing an already-synced/added deck needs zero internet access — only
   // Connect/Sync/Add Cards/AI talk to anything outside localhost. Surface
@@ -63,25 +76,28 @@ export default function App() {
   }, []);
 
   const loadProblems = useCallback(() => {
-    fetchProblems({ difficulty, tag, q: search, source: sourceFilter }).then((list) => {
-      setProblems(list);
-      if (pendingSlug) {
-        const i = list.findIndex((p) => p.slug === pendingSlug);
-        setPendingSlug(null);
-        if (i >= 0) {
-          setIndex(i);
-          return;
+    fetchProblems({ difficulty, tag, q: search, source: sourceFilter, company: companyFilter }).then(
+      (list) => {
+        setProblems(list);
+        if (pendingSlug) {
+          const i = list.findIndex((p) => p.slug === pendingSlug);
+          setPendingSlug(null);
+          if (i >= 0) {
+            setIndex(i);
+            return;
+          }
         }
+        setIndex(0);
       }
-      setIndex(0);
-    });
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [difficulty, tag, search, sourceFilter, pendingSlug]);
+  }, [difficulty, tag, search, sourceFilter, companyFilter, pendingSlug]);
 
   useEffect(() => {
     fetchConfig().then((c) => setAiEnabled(c.aiEnabled));
     fetchActivity().then(setActivity);
     fetchAuthStatus().then(setAuthStatus);
+    fetchCompanies().then(setCompanies);
   }, []);
 
   useEffect(() => {
@@ -200,6 +216,57 @@ export default function App() {
     setCurrent(updated);
   }
 
+  async function handleSyncCompanies() {
+    setCompanySyncStatus('running');
+    setCompanySyncMessage('Fetching company tags from the public dataset — this can take ~10s…');
+    try {
+      const result = await syncCompanyTags();
+      setCompanySyncStatus('done');
+      setCompanySyncMessage(
+        `Tagged ${result.tagged} of ${result.totalChecked} LeetCode problems across ${result.companiesFound} companies.`
+      );
+      fetchCompanies().then(setCompanies);
+      loadProblems();
+    } catch (err) {
+      setCompanySyncStatus('error');
+      setCompanySyncMessage(err instanceof Error ? err.message : 'Company sync failed');
+    }
+  }
+
+  async function handleExport() {
+    const data = await exportDeck();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `haleeco-deck-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImport() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleImportFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const result = await importDeck(data);
+      setSyncMessage(`Imported ${result.imported}, skipped ${result.skipped} (from file).`);
+      setSyncStatus('done');
+      loadProblems();
+    } catch (err) {
+      setSyncStatus('error');
+      setSyncMessage(err instanceof Error ? err.message : 'Import failed — is that a HaLeeCo export file?');
+    }
+  }
+
   if (!entered) {
     return (
       <LandingPage
@@ -225,13 +292,17 @@ export default function App() {
         view={view}
         problems={problems}
         tags={tags}
+        companies={companies}
         search={search}
         difficulty={difficulty}
         tag={tag}
+        companyFilter={companyFilter}
         sourceFilter={sourceFilter}
         currentSlug={problems[index]?.slug}
         syncStatus={syncStatus}
         syncMessage={syncMessage}
+        companySyncStatus={companySyncStatus}
+        companySyncMessage={companySyncMessage}
         activity={activity}
         authStatus={authStatus}
         loginState={loginState}
@@ -239,16 +310,27 @@ export default function App() {
         onSearchChange={setSearch}
         onDifficultyChange={setDifficulty}
         onTagChange={setTag}
+        onCompanyFilterChange={setCompanyFilter}
         onSourceFilterChange={setSourceFilter}
         onSelect={(slug) => {
           setView('deck');
           setIndex(problems.findIndex((p) => p.slug === slug));
         }}
         onSync={handleSync}
+        onSyncCompanies={handleSyncCompanies}
         onAddCards={() => setShowAddPanel(true)}
         onConnect={handleConnect}
         onViewChange={setView}
         onManualConnected={handleManualConnected}
+        onExport={handleExport}
+        onImport={handleImport}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json"
+        style={{ display: 'none' }}
+        onChange={handleImportFileChosen}
       />
 
       <button
@@ -261,39 +343,43 @@ export default function App() {
       </button>
 
       <main className="main">
-        {view === 'analysis' ? (
-          <AnalysisView />
-        ) : view === 'daily' ? (
-          <DailyWork />
-        ) : current ? (
-          <>
-            <div className="deck-controls">
-              <button onClick={goPrev} disabled={index === 0}>
-                ← Prev
-              </button>
-              <span className="progress">
-                {index + 1} / {problems.length}
-              </span>
-              <button onClick={goNext} disabled={index === problems.length - 1}>
-                Next →
-              </button>
-              <button className="shuffle-btn" onClick={shuffle}>
-                Shuffle
-              </button>
+        <ErrorBoundary key={view}>
+          {view === 'analysis' ? (
+            <AnalysisView />
+          ) : view === 'daily' ? (
+            <DailyWork />
+          ) : view === 'mock' ? (
+            <MockInterview />
+          ) : current ? (
+            <>
+              <div className="deck-controls">
+                <button onClick={goPrev} disabled={index === 0}>
+                  ← Prev
+                </button>
+                <span className="progress">
+                  {index + 1} / {problems.length}
+                </span>
+                <button onClick={goNext} disabled={index === problems.length - 1}>
+                  Next →
+                </button>
+                <button className="shuffle-btn" onClick={shuffle}>
+                  Shuffle
+                </button>
+              </div>
+              <FlashCard
+                problem={current}
+                flipped={flipped}
+                onFlip={() => setFlipped((f) => !f)}
+                onSaveCode={handleSaveCode}
+              />
+            </>
+          ) : (
+            <div className="empty-main">
+              <p>No flashcards yet.</p>
+              <p>Connect LeetCode to sync your own solves, or use "+ Add Cards" for public/AI ones.</p>
             </div>
-            <FlashCard
-              problem={current}
-              flipped={flipped}
-              onFlip={() => setFlipped((f) => !f)}
-              onSaveCode={handleSaveCode}
-            />
-          </>
-        ) : (
-          <div className="empty-main">
-            <p>No flashcards yet.</p>
-            <p>Connect LeetCode to sync your own solves, or use "+ Add Cards" for public/AI ones.</p>
-          </div>
-        )}
+          )}
+        </ErrorBoundary>
       </main>
 
       {showAddPanel && (
