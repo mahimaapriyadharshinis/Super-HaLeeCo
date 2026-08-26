@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import FlashCard from './components/FlashCard';
 import AddCardsPanel from './components/AddCardsPanel';
@@ -21,8 +21,6 @@ import {
   fetchLoginStatus,
   fetchCompanies,
   syncCompanyTags,
-  exportDeck,
-  importDeck,
 } from './api';
 import type { ProblemSummary, ProblemDetail, ActivityData, AuthStatus, LoginState } from './api';
 import './styles.css';
@@ -55,7 +53,6 @@ export default function App() {
   const [offline, setOffline] = useState(!navigator.onLine);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [view, setView] = useState<'deck' | 'analysis' | 'daily' | 'mock'>('deck');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reviewing an already-synced/added deck needs zero internet access — only
   // Connect/Sync/Add Cards/AI talk to anything outside localhost. Surface
@@ -233,40 +230,6 @@ export default function App() {
     }
   }
 
-  async function handleExport() {
-    const data = await exportDeck();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `haleeco-deck-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function handleImport() {
-    fileInputRef.current?.click();
-  }
-
-  async function handleImportFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      const result = await importDeck(data);
-      setSyncMessage(`Imported ${result.imported}, skipped ${result.skipped} (from file).`);
-      setSyncStatus('done');
-      loadProblems();
-    } catch (err) {
-      setSyncStatus('error');
-      setSyncMessage(err instanceof Error ? err.message : 'Import failed — is that a HaLeeCo export file?');
-    }
-  }
-
   if (!entered) {
     return (
       <LandingPage
@@ -322,15 +285,6 @@ export default function App() {
         onConnect={handleConnect}
         onViewChange={setView}
         onManualConnected={handleManualConnected}
-        onExport={handleExport}
-        onImport={handleImport}
-      />
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="application/json"
-        style={{ display: 'none' }}
-        onChange={handleImportFileChosen}
       />
 
       <button

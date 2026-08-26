@@ -132,6 +132,30 @@ export function syncCompanyTags() {
   return fetch('/api/companies/sync', { method: 'POST' }).then((r) => json<CompanySyncResult>(r));
 }
 
+export function fetchCompanyCatalog() {
+  return fetch('/api/companies/catalog').then((r) => json<string[]>(r));
+}
+
+export interface CompanyProblem {
+  slug: string;
+  title: string;
+  difficulty: string;
+}
+
+export function fetchCompanyProblemList(company: string) {
+  return fetch(`/api/companies/${encodeURIComponent(company)}/problems`).then((r) =>
+    json<CompanyProblem[]>(r)
+  );
+}
+
+export function tagProblemWithCompany(slug: string, company: string) {
+  return fetch(`/api/problems/${slug}/tag-company`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ company }),
+  }).then((r) => json<ProblemDetail>(r));
+}
+
 export function fetchTags() {
   return fetch('/api/tags').then((r) => json<string[]>(r));
 }
@@ -275,29 +299,6 @@ export function answerDailyQuiz(slug: string, correct: boolean) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ slug, correct }),
   }).then((r) => json<DailySet>(r));
-}
-
-export interface DeckExport {
-  exportedAt: number;
-  version: number;
-  problems: ProblemDetail[];
-}
-
-export function exportDeck() {
-  return fetch('/api/export').then((r) => json<DeckExport>(r));
-}
-
-export interface ImportResult {
-  imported: number;
-  skipped: number;
-}
-
-export function importDeck(payload: DeckExport) {
-  return fetch('/api/import', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  }).then((r) => json<ImportResult>(r));
 }
 
 export interface MockSession {

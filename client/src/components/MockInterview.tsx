@@ -240,6 +240,11 @@ function MockCard({
           {card.questionId ? `${card.questionId}. ` : ''}
           {card.title}
         </h2>
+        {card.sourceUrl && (
+          <a className="solve-it-link" href={card.sourceUrl} target="_blank" rel="noopener noreferrer">
+            Solve it ↗
+          </a>
+        )}
       </div>
       <div className="problem-content" dangerouslySetInnerHTML={{ __html: cleanHtml }} />
 

@@ -36,8 +36,6 @@ interface Props {
   onConnect: () => void;
   onViewChange: (v: View) => void;
   onManualConnected: (auth: AuthStatus) => void;
-  onExport: () => void;
-  onImport: () => void;
 }
 
 const DIFFICULTIES = ['', 'Easy', 'Medium', 'Hard'];
@@ -81,8 +79,6 @@ export default function Sidebar({
   onConnect,
   onViewChange,
   onManualConnected,
-  onExport,
-  onImport,
 }: Props) {
   const connected = !!authStatus?.connected;
   const loggingIn = loginState?.status === 'waiting';
@@ -160,12 +156,6 @@ export default function Sidebar({
           title="Tag your deck with which companies have asked each LeetCode problem"
         >
           {companySyncStatus === 'running' ? 'TAGGING…' : 'SYNC COMPANIES'}
-        </button>
-        <button className="pixel-btn ghost small" onClick={onExport}>
-          EXPORT
-        </button>
-        <button className="pixel-btn ghost small" onClick={onImport}>
-          IMPORT
         </button>
       </div>
       {companySyncMessage && (

@@ -1081,6 +1081,19 @@ select:focus {
   color: var(--text-dim);
 }
 
+.company-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.company-tab select,
+.company-tab .search-input {
+  width: 100%;
+}
+
 .random-buttons {
   display: flex;
   gap: 8px;

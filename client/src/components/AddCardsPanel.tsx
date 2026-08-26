@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   searchLeetCode,
   fetchRandom,
   fetchSmartPick,
   importProblem,
   createManualProblem,
+  fetchCompanyCatalog,
+  fetchCompanyProblemList,
+  tagProblemWithCompany,
 } from '../api';
-import type { PublicQuestion, Platform } from '../api';
+import type { PublicQuestion, Platform, CompanyProblem } from '../api';
 
 const LANGUAGES = [
   'Python3',
@@ -33,7 +36,7 @@ interface Props {
   onImported: (slug: string) => void;
 }
 
-type Tab = 'search' | 'random' | 'manual';
+type Tab = 'search' | 'random' | 'company' | 'manual';
 
 export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props) {
   const [tab, setTab] = useState<Tab>('search');
@@ -55,6 +58,32 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
   const [manualLang, setManualLang] = useState('Python3');
   const [savingManual, setSavingManual] = useState(false);
 
+  const [companyCatalog, setCompanyCatalog] = useState<string[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState('');
+  const [companyProblems, setCompanyProblems] = useState<CompanyProblem[]>([]);
+  const [companyLoading, setCompanyLoading] = useState(false);
+  const [companySearch, setCompanySearch] = useState('');
+
+  useEffect(() => {
+    fetchCompanyCatalog().then(setCompanyCatalog).catch(() => {});
+  }, []);
+
+  async function loadCompanyProblems(company: string) {
+    setSelectedCompany(company);
+    setCompanyProblems([]);
+    setCompanySearch('');
+    if (!company) return;
+    setCompanyLoading(true);
+    setError('');
+    try {
+      setCompanyProblems(await fetchCompanyProblemList(company));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load company problems');
+    } finally {
+      setCompanyLoading(false);
+    }
+  }
+
   async function runSearch(e?: React.FormEvent) {
     e?.preventDefault();
     setSearching(true);
@@ -68,7 +97,7 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
     }
   }
 
-  async function doImport(platform: Platform, id: string) {
+  async function doImport(platform: Platform, id: string, companyTag?: string) {
     const key = `${platform}:${id}`;
     setBusyKey(key);
     setError('');
@@ -79,6 +108,9 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
         generateSolution: genSolution && aiEnabled,
         language,
       });
+      if (companyTag) {
+        await tagProblemWithCompany(problem.slug, companyTag).catch(() => {});
+      }
       onImported(problem.slug);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
@@ -157,12 +189,15 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
           <button className={tab === 'random' ? 'active' : ''} onClick={() => setTab('random')}>
             Random
           </button>
+          <button className={tab === 'company' ? 'active' : ''} onClick={() => setTab('company')}>
+            By Company
+          </button>
           <button className={tab === 'manual' ? 'active' : ''} onClick={() => setTab('manual')}>
             Manual / Paste
           </button>
         </div>
 
-        {(tab === 'search' || tab === 'random') && aiEnabled && (
+        {(tab === 'search' || tab === 'random' || tab === 'company') && aiEnabled && (
           <div className="ai-toggle-row">
             <label>
               <input
@@ -181,7 +216,7 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
             </select>
           </div>
         )}
-        {(tab === 'search' || tab === 'random') && !aiEnabled && (
+        {(tab === 'search' || tab === 'random' || tab === 'company') && !aiEnabled && (
           <div className="ai-disabled-note">
             No GEMINI_API_KEY configured — cards will be added with blank code for you to fill
             in yourself. See README to enable AI-generated solutions.
@@ -263,6 +298,72 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
             <p className="smart-pick-hint">
               Smart Pick targets an important topic you're weak on or haven't solved yet.
             </p>
+          </div>
+        )}
+
+        {tab === 'company' && (
+          <div className="company-tab">
+            <p>
+              Browse real LeetCode questions by company — search here, hit{' '}
+              <strong>Solve it ↗</strong> to work on it on the real site, then come back and add
+              it once you're done (or right away, to fill in later).
+            </p>
+            <select
+              className="tag-select"
+              value={selectedCompany}
+              onChange={(e) => loadCompanyProblems(e.target.value)}
+            >
+              <option value="">Choose a company…</option>
+              {companyCatalog.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+
+            {selectedCompany && (
+              <>
+                <input
+                  className="search-input"
+                  placeholder="&gt; search within these questions_"
+                  value={companySearch}
+                  onChange={(e) => setCompanySearch(e.target.value)}
+                />
+                {companyLoading ? (
+                  <p>Loading {selectedCompany}'s questions…</p>
+                ) : (
+                  <ul className="public-results">
+                    {companyProblems
+                      .filter((p) => p.title.toLowerCase().includes(companySearch.toLowerCase()))
+                      .slice(0, 100)
+                      .map((p) => (
+                        <li key={p.slug}>
+                          <span className={`difficulty-badge difficulty-${p.difficulty.toLowerCase()}`}>
+                            {p.difficulty[0]}
+                          </span>
+                          <span className="result-title">{p.title}</span>
+                          <a
+                            className="solve-it-link"
+                            href={`https://leetcode.com/problems/${p.slug}/`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Solve it ↗
+                          </a>
+                          <button
+                            className="pixel-btn small"
+                            disabled={busyKey === `leetcode:${p.slug}`}
+                            onClick={() => doImport('leetcode', p.slug, selectedCompany)}
+                          >
+                            {busyKey === `leetcode:${p.slug}` ? '...' : '+ Add'}
+                          </button>
+                        </li>
+                      ))}
+                    {companyProblems.length === 0 && <li className="empty-state">No data for this company.</li>}
+                  </ul>
+                )}
+              </>
+            )}
           </div>
         )}
 

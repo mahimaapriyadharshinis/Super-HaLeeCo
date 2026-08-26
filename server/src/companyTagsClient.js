@@ -20,6 +20,14 @@ function slugFromCsvLine(line) {
   return match ? match[1].toLowerCase() : null;
 }
 
+function parseCompanyCsvLine(line) {
+  const match = line.match(
+    /^\d+,(.+?),[\d.]+%,(Easy|Medium|Hard),[\d.]+,\s*https:\/\/leetcode\.com\/problems\/([a-z0-9-]+)/i
+  );
+  if (!match) return null;
+  return { title: match[1].trim(), difficulty: match[2], slug: match[3].toLowerCase() };
+}
+
 async function fetchCompanyFileList() {
   const res = await fetch(REPO_CONTENTS_API, {
     headers: { 'User-Agent': 'haleeco-app', Accept: 'application/vnd.github+json' },
@@ -45,6 +53,27 @@ async function mapWithConcurrency(items, limit, fn) {
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
+// The full list of companies in the dataset, for browsing questions that
+// aren't in your deck yet — not to be confused with listAllCompanies() in
+// db.js, which only lists companies already tagged on your local problems.
+export async function listCompanyCatalog() {
+  const files = await fetchCompanyFileList();
+  return files.map((f) => companyNameFromFile(f)).sort((a, b) => a.localeCompare(b));
+}
+
+// All problems the dataset associates with one company, independent of
+// whether you already have them in your deck.
+export async function fetchCompanyProblems(companyName) {
+  const files = await fetchCompanyFileList();
+  const file = files.find((f) => companyNameFromFile(f).toLowerCase() === companyName.toLowerCase());
+  if (!file) throw new Error(`No data found for "${companyName}".`);
+
+  const res = await fetch(RAW_BASE + file);
+  if (!res.ok) throw new Error(`Could not fetch data for "${companyName}" (${res.status}).`);
+  const text = await res.text();
+  return text.split('\n').slice(1).map(parseCompanyCsvLine).filter(Boolean);
 }
 
 // Returns Map<leetcodeSlug, Set<companyName>> across every company file.

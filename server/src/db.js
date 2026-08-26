@@ -455,28 +455,3 @@ export function listMockSessions(limit = 20) {
     .map(hydrateMockSession);
 }
 
-// ---- Export / import ----
-
-export function exportAllProblems() {
-  return db
-    .prepare('SELECT * FROM problems')
-    .all()
-    .map((row) => ({
-      slug: row.slug,
-      questionId: row.question_id,
-      title: row.title,
-      difficulty: row.difficulty,
-      tags: JSON.parse(row.tags || '[]'),
-      contentHtml: row.content_html,
-      sampleTestcase: row.sample_testcase,
-      exampleTestcases: row.example_testcases,
-      code: row.code,
-      lang: row.lang,
-      submittedAt: row.submitted_at,
-      syncedAt: row.synced_at,
-      source: row.source,
-      platform: row.platform,
-      sourceUrl: row.source_url,
-      companies: JSON.parse(row.companies || '[]'),
-    }));
-}

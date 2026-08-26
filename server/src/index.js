@@ -14,12 +14,11 @@ import {
   pingActivity,
   getActivity,
   listSolvedProblems,
-  exportAllProblems,
   setProblemCompanies,
   listAllCompanies,
   getAllLeetCodeSlugs,
 } from './db.js';
-import { buildCompanySlugMap } from './companyTagsClient.js';
+import { buildCompanySlugMap, listCompanyCatalog, fetchCompanyProblems } from './companyTagsClient.js';
 import {
   startMockSession,
   finishMockSession,
@@ -143,50 +142,33 @@ app.post('/api/companies/sync', async (_req, res) => {
   }
 });
 
-app.get('/api/export', (_req, res) => {
-  res.json({ exportedAt: Date.now(), version: 1, problems: exportAllProblems() });
+// Full dataset catalog — for browsing/searching questions by company that
+// aren't in your deck yet, as opposed to /api/companies which only lists
+// companies already tagged on problems you have.
+app.get('/api/companies/catalog', async (_req, res) => {
+  try {
+    res.json(await listCompanyCatalog());
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
 });
 
-app.post('/api/import', (req, res) => {
-  const incoming = Array.isArray(req.body?.problems) ? req.body.problems : null;
-  if (!incoming) return res.status(400).json({ error: 'Expected { problems: [...] } from a HaLeeCo export.' });
-
-  let imported = 0;
-  let skipped = 0;
-  for (const p of incoming) {
-    if (!p?.slug || !p?.title) {
-      skipped++;
-      continue;
-    }
-    // Never let an import clobber a real solved submission already on disk.
-    const existing = getProblem(p.slug);
-    if (existing && existing.source === 'own') {
-      skipped++;
-      continue;
-    }
-    upsertProblem({
-      slug: p.slug,
-      questionId: p.questionId ?? null,
-      title: p.title,
-      difficulty: p.difficulty ?? null,
-      tags: JSON.stringify(p.tags ?? []),
-      contentHtml: p.contentHtml ?? '',
-      sampleTestcase: p.sampleTestcase ?? '',
-      exampleTestcases: p.exampleTestcases ?? '',
-      code: p.code ?? '',
-      lang: p.lang ?? '',
-      submittedAt: p.submittedAt ?? null,
-      syncedAt: Date.now(),
-      source: p.source === 'own' ? 'manual' : (p.source ?? 'manual'),
-      platform: p.platform ?? 'leetcode',
-      sourceUrl: p.sourceUrl ?? null,
-    });
-    if (Array.isArray(p.companies) && p.companies.length > 0) {
-      setProblemCompanies(p.slug, p.companies);
-    }
-    imported++;
+app.get('/api/companies/:company/problems', async (req, res) => {
+  try {
+    res.json(await fetchCompanyProblems(req.params.company));
+  } catch (err) {
+    res.status(502).json({ error: err.message });
   }
-  res.json({ imported, skipped });
+});
+
+app.post('/api/problems/:slug/tag-company', (req, res) => {
+  const problem = getProblem(req.params.slug);
+  if (!problem) return res.status(404).json({ error: 'Not found' });
+  const company = req.body?.company;
+  if (!company) return res.status(400).json({ error: 'company is required' });
+  const merged = Array.from(new Set([...(problem.companies || []), company])).sort();
+  setProblemCompanies(req.params.slug, merged);
+  res.json(getProblem(req.params.slug));
 });
 
 app.get('/api/tags', (_req, res) => {

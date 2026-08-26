@@ -60,7 +60,11 @@ to the judges themselves, and optionally to Gemini for solution generation.
   attempted, instead of a uniform random choice
 - Company tags — a one-click sync tags every LeetCode problem in your deck with which real
   companies have asked it (sourced live from a public community dataset, never bundled into
-  this repo), filterable from the sidebar like any other facet
+  this repo), filterable from the sidebar like any other facet, and shown as chips right on
+  the card
+- Browse by Company — discover *new* questions a specific company has asked (not just filter
+  ones already in your deck), search within them, jump straight to the real LeetCode page to
+  solve it there, then add it to your deck when you're done
 - Optional AI-generated solutions via Gemini, comment-free by default, with an automatic
   self-correction pass if the model adds one anyway
 - Manual entry for content from any source
@@ -74,8 +78,9 @@ to the judges themselves, and optionally to Gemini for solution generation.
   card — one question per card, graded automatically, and the grade feeds directly back into
   that card's SM-2 schedule
 - Timed mock interviews — pick a duration and a problem count, work through them with the
-  code hidden until time's up or you finish early, then self-rate and review against your own
-  saved solution; past sessions are kept in a lightweight history
+  code hidden until time's up or you finish early (a **Solve it ↗** link jumps straight to the
+  real problem page so you actually have somewhere to write code), then self-rate and review
+  against your own saved solution; past sessions are kept in a lightweight history
 - Topic Analysis — every core DSA topic plotted against how many times you've solved
   something tagged with it, so gaps are visible at a glance
 - Streak tracking with a contribution-graph-style heatmap, plus a running points total per
@@ -88,8 +93,6 @@ to the judges themselves, and optionally to Gemini for solution generation.
 **Engineering**
 - Fully local: SQLite on disk, both dev servers bound to loopback only
 - Filterable by source, difficulty, tag, company, or title across the entire deck
-- Export your whole deck to a JSON file and re-import it elsewhere — a real backup, not just
-  a data dump
 - Collapsible sidebar layout
 - Automated tests (Vitest, backend logic + frontend components) and CI on every push
 - Optional single-container Docker deploy with a no-login demo-data seed — see
@@ -293,9 +296,9 @@ Shipped:
 - [x] SM-2 spaced repetition for Today's Work
 - [x] Automated test suite (Vitest) and CI (GitHub Actions)
 - [x] Timed mock-interview mode with session history
-- [x] Company-tagged problem sets, sourced live from a public dataset
+- [x] Company-tagged problem sets, sourced live from a public dataset, with a browse-by-company
+  discovery flow
 - [x] Docker packaging with an optional no-login demo-data seed
-- [x] Deck export/import as JSON
 
 Planned:
 
