@@ -55,6 +55,26 @@ Render, Fly.io, and Railway all have free tiers as of this writing:
 None of this requires creating any accounts here in this session — it's a
 few clicks on whichever platform you pick.
 
+### Fastest path: Render Blueprint
+
+This repo includes a `render.yaml` at the root, so Render can create and
+configure the service for you instead of doing step 2-3 above by hand:
+
+1. Go to https://dashboard.render.com/blueprints and click "New Blueprint
+   Instance".
+2. Connect your GitHub account (first time only) and pick this repo.
+3. Render reads `render.yaml` and pre-fills the service (Docker runtime,
+   `DEMO_MODE=true`, `HOST=0.0.0.0`, port 5174). Paste a `GEMINI_API_KEY`
+   in the one field it leaves blank if you want AI-generated
+   solutions/quizzes, or leave it empty otherwise.
+4. Click "Apply". Render builds the image and gives you a permanent
+   `https://<something>.onrender.com` URL — bookmark that instead of
+   running the app locally each time.
+
+Free-tier web services on Render spin down after 15 minutes idle and take
+~30-60s to wake back up on the next request — expect that cold-start delay
+the first time you open the link after a while.
+
 ## Known limitation: Codeforces fetching inside a container
 
 `codeforcesClient.js` shells out to `curl` to get past Cloudflare (Node's
