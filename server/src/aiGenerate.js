@@ -12,7 +12,12 @@ export function aiEnabled() {
   return !!process.env.GEMINI_API_KEY;
 }
 
-function getClient() {
+// `apiKey` is a per-request key a visitor pasted into their own browser (see
+// the AI Key modal client-side) — it's never persisted here, only used to
+// build a throwaway client for that one call, so a hosted demo doesn't burn
+// through the deploy owner's own Gemini quota for every visitor.
+function getClient(apiKey) {
+  if (apiKey) return new GoogleGenAI({ apiKey });
   if (!client) client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   return client;
 }
@@ -67,14 +72,14 @@ function looksCommented(code) {
   return /(^|\n)\s*(#|\/\/)/.test(code) || /\s{2,}(#|\/\/)\s?\S/.test(code) || /\/\*[\s\S]*?\*\//.test(code);
 }
 
-export async function generateSolution({ title, contentHtml, difficulty, language }) {
-  if (!aiEnabled()) {
-    throw new Error('GEMINI_API_KEY is not set in .env — AI generation is disabled.');
+export async function generateSolution({ title, contentHtml, difficulty, language, apiKey }) {
+  if (!apiKey && !aiEnabled()) {
+    throw new Error('No Gemini API key set — AI generation is disabled. Set your own key to enable it.');
   }
   const questionText = htmlToText(contentHtml);
   const prompt = `Problem: ${title} (${difficulty})\n\n${questionText}\n\nWrite a solution in ${language}.`;
 
-  const client = getClient();
+  const client = getClient(apiKey);
   try {
     let code = stripFences(
       (
@@ -115,9 +120,9 @@ const QUIZ_SYSTEM_INSTRUCTION =
   'QUESTION: <the question>\nA: <option A>\nB: <option B>\nC: <option C>\nD: <option D>\n' +
   'CORRECT: <A, B, C, or D>\nEXPLANATION: <1-3 sentences on why that option is correct>';
 
-export async function generateQuizQuestion({ title, contentHtml, code, lang }) {
-  if (!aiEnabled()) {
-    throw new Error('GEMINI_API_KEY is not set in .env — quiz generation is disabled.');
+export async function generateQuizQuestion({ title, contentHtml, code, lang, apiKey }) {
+  if (!apiKey && !aiEnabled()) {
+    throw new Error('No Gemini API key set — quiz generation is disabled. Set your own key to enable it.');
   }
   const questionText = htmlToText(contentHtml);
   const prompt =
@@ -126,7 +131,7 @@ export async function generateQuizQuestion({ title, contentHtml, code, lang }) {
 
   let text;
   try {
-    const response = await getClient().models.generateContent({
+    const response = await getClient(apiKey).models.generateContent({
       model: MODEL,
       contents: prompt,
       config: { systemInstruction: QUIZ_SYSTEM_INSTRUCTION },

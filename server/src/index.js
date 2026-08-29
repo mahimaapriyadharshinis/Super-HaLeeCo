@@ -55,6 +55,14 @@ app.get('/api/config', (_req, res) => {
   res.json({ aiEnabled: aiEnabled() });
 });
 
+// A visitor's own Gemini key, sent per-request from their browser's AI Key
+// modal — read here and threaded through to aiGenerate.js, never logged or
+// persisted server-side. Lets a hosted demo offer AI features without every
+// visitor sharing the deploy owner's quota.
+function personalGeminiKey(req) {
+  return req.get('x-gemini-key')?.trim() || undefined;
+}
+
 // ---- LeetCode login (browser-assisted, no passwords touch this app) ----
 
 app.get('/api/auth/status', async (_req, res) => {
@@ -287,9 +295,9 @@ app.post('/api/daily/complete', (req, res) => {
   }
 });
 
-app.get('/api/daily/quiz', async (_req, res) => {
+app.get('/api/daily/quiz', async (req, res) => {
   try {
-    res.json(await getOrGenerateQuiz());
+    res.json(await getOrGenerateQuiz(personalGeminiKey(req)));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -363,7 +371,11 @@ app.get('/api/smart-pick', async (req, res) => {
 app.post('/api/problems/import', async (req, res) => {
   const { platform = 'leetcode', id, generateSolution: wantSolution, language } = req.body;
   try {
-    const problem = await importPublicProblem(platform, id, { wantSolution, language });
+    const problem = await importPublicProblem(platform, id, {
+      wantSolution,
+      language,
+      apiKey: personalGeminiKey(req),
+    });
     res.json(problem);
   } catch (err) {
     res.status(err.message?.startsWith('Unknown platform') ? 400 : 500).json({ error: err.message });

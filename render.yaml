@@ -12,5 +12,3 @@ services:
         value: 0.0.0.0
       - key: DEMO_MODE
         value: true
-      - key: GEMINI_API_KEY
-        sync: false

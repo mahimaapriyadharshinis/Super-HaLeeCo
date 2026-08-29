@@ -32,13 +32,14 @@ const PLATFORMS: { value: Platform; label: string }[] = [
 
 interface Props {
   aiEnabled: boolean;
+  onOpenAiKey: () => void;
   onClose: () => void;
   onImported: (slug: string) => void;
 }
 
 type Tab = 'search' | 'random' | 'company' | 'manual';
 
-export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props) {
+export default function AddCardsPanel({ aiEnabled, onOpenAiKey, onClose, onImported }: Props) {
   const [tab, setTab] = useState<Tab>('search');
   const [genSolution, setGenSolution] = useState(aiEnabled);
   const [language, setLanguage] = useState('Python3');
@@ -222,8 +223,11 @@ export default function AddCardsPanel({ aiEnabled, onClose, onImported }: Props)
         )}
         {(tab === 'search' || tab === 'random' || tab === 'company') && !aiEnabled && (
           <div className="ai-disabled-note">
-            No GEMINI_API_KEY configured — cards will be added with blank code for you to fill
-            in yourself. See README to enable AI-generated solutions.
+            No Gemini API key configured — cards will be added with blank code for you to fill
+            in yourself.{' '}
+            <button className="pixel-btn ghost small" onClick={onOpenAiKey}>
+              Use your own Gemini key
+            </button>
           </div>
         )}
 

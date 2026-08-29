@@ -7,7 +7,7 @@ import { generateSolution, aiEnabled } from './aiGenerate.js';
 // Shared by the /api/problems/import route and the demo-mode seed script —
 // fetches a public problem from whichever judge and normalizes it into the
 // shape upsertProblem expects.
-export async function importPublicProblem(platform, id, { wantSolution = false, language } = {}) {
+export async function importPublicProblem(platform, id, { wantSolution = false, language, apiKey } = {}) {
   let slug, title, difficulty, tags, contentHtml, sourceUrl, questionId, sampleTestcase, exampleTestcases;
 
   if (platform === 'leetcode') {
@@ -51,8 +51,8 @@ export async function importPublicProblem(platform, id, { wantSolution = false, 
   let source = 'manual';
   let lang = language || 'plaintext';
 
-  if (wantSolution && aiEnabled()) {
-    code = await generateSolution({ title, contentHtml, difficulty, language: language || 'Python' });
+  if (wantSolution && (aiEnabled() || apiKey)) {
+    code = await generateSolution({ title, contentHtml, difficulty, language: language || 'Python', apiKey });
     source = 'ai';
     lang = language || 'Python';
   }

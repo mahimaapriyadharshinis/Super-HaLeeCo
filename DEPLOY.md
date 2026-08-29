@@ -16,6 +16,18 @@ Real account features (Connect LeetCode, Sync Mine) still work if a visitor
 wants to try them, but obviously require their own LeetCode session — they
 aren't part of what demo mode sets up.
 
+## AI features on a public deploy: bring-your-own-key
+
+If you deploy this publicly, do **not** set `GEMINI_API_KEY` on the hosting
+platform — every visitor's AI-generated solutions/quizzes would draw down
+your own personal Gemini quota. Instead, leave it unset: the client shows a
+"SET AI KEY" button (sidebar) / "Use your own Gemini key" prompt (Add Cards
+panel) that lets each visitor paste their own free key
+(https://aistudio.google.com/apikey). It's stored only in their browser's
+localStorage and sent only as a per-request header on their own AI calls —
+never persisted anywhere server-side. Without a key, everything still works
+except AI generation; cards just get blank code instead.
+
 ## Build and run locally with Docker
 
 ```bash
@@ -64,9 +76,9 @@ configure the service for you instead of doing step 2-3 above by hand:
    Instance".
 2. Connect your GitHub account (first time only) and pick this repo.
 3. Render reads `render.yaml` and pre-fills the service (Docker runtime,
-   `DEMO_MODE=true`, `HOST=0.0.0.0`, port 5174). Paste a `GEMINI_API_KEY`
-   in the one field it leaves blank if you want AI-generated
-   solutions/quizzes, or leave it empty otherwise.
+   `DEMO_MODE=true`, `HOST=0.0.0.0`, port 5174) — no fields to fill in.
+   Don't add a `GEMINI_API_KEY` yourself here; see "bring-your-own-key"
+   above for why.
 4. Click "Apply". Render builds the image and gives you a permanent
    `https://<something>.onrender.com` URL — bookmark that instead of
    running the app locally each time.

@@ -36,6 +36,8 @@ interface Props {
   onConnect: () => void;
   onViewChange: (v: View) => void;
   onManualConnected: (auth: AuthStatus) => void;
+  hasOwnAiKey: boolean;
+  onOpenAiKey: () => void;
 }
 
 const DIFFICULTIES = ['', 'Easy', 'Medium', 'Hard'];
@@ -79,6 +81,8 @@ export default function Sidebar({
   onConnect,
   onViewChange,
   onManualConnected,
+  hasOwnAiKey,
+  onOpenAiKey,
 }: Props) {
   const connected = !!authStatus?.connected;
   const loggingIn = loginState?.status === 'waiting';
@@ -158,6 +162,16 @@ export default function Sidebar({
       {companySyncMessage && (
         <div className={`sync-message sync-${companySyncStatus}`}>{companySyncMessage}</div>
       )}
+
+      <div className="action-row">
+        <button
+          className="pixel-btn small"
+          onClick={onOpenAiKey}
+          title="Use your own Gemini API key for AI-generated solutions/quizzes (stored only in this browser)"
+        >
+          {hasOwnAiKey ? 'AI KEY: SET ✓' : 'SET AI KEY'}
+        </button>
+      </div>
 
       <input
         className="search-input"

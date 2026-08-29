@@ -1,3 +1,5 @@
+import { geminiKeyHeaders } from './geminiKey';
+
 export type Source = 'own' | 'manual' | 'ai';
 export type Platform = 'leetcode' | 'codeforces' | 'hackerrank';
 
@@ -198,7 +200,7 @@ export function importProblem(params: {
 }) {
   return fetch('/api/problems/import', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...geminiKeyHeaders() },
     body: JSON.stringify(params),
   }).then((r) => json<ProblemDetail>(r));
 }
@@ -290,7 +292,7 @@ export function completeDailyCard(slug: string) {
 }
 
 export function fetchDailyQuiz() {
-  return fetch('/api/daily/quiz').then((r) => json<QuizItem[]>(r));
+  return fetch('/api/daily/quiz', { headers: geminiKeyHeaders() }).then((r) => json<QuizItem[]>(r));
 }
 
 export function answerDailyQuiz(slug: string, correct: boolean) {

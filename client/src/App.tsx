@@ -6,6 +6,8 @@ import LandingPage from './components/LandingPage';
 import AnalysisView from './components/AnalysisView';
 import DailyWork from './components/DailyWork';
 import ErrorBoundary from './components/ErrorBoundary';
+import GeminiKeyModal from './components/GeminiKeyModal';
+import { getGeminiKey, setGeminiKey } from './geminiKey';
 import {
   fetchProblems,
   fetchTags,
@@ -44,6 +46,9 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [syncMessage, setSyncMessage] = useState('');
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [geminiKey, setGeminiKeyState] = useState(getGeminiKey());
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const effectiveAiEnabled = aiEnabled || !!geminiKey;
   const [activity, setActivity] = useState<ActivityData | null>(null);
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
@@ -196,6 +201,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loginState?.status]);
 
+  function handleSaveGeminiKey(key: string) {
+    setGeminiKey(key);
+    setGeminiKeyState(key);
+  }
+
   function handleImported(slug: string) {
     setShowAddPanel(false);
     // Don't call loadProblems() here — it would run with this render's
@@ -284,6 +294,8 @@ export default function App() {
         onConnect={handleConnect}
         onViewChange={setView}
         onManualConnected={handleManualConnected}
+        hasOwnAiKey={!!geminiKey}
+        onOpenAiKey={() => setShowKeyModal(true)}
       />
 
       <button
@@ -335,9 +347,18 @@ export default function App() {
 
       {showAddPanel && (
         <AddCardsPanel
-          aiEnabled={aiEnabled}
+          aiEnabled={effectiveAiEnabled}
+          onOpenAiKey={() => setShowKeyModal(true)}
           onClose={() => setShowAddPanel(false)}
           onImported={handleImported}
+        />
+      )}
+
+      {showKeyModal && (
+        <GeminiKeyModal
+          initialKey={geminiKey}
+          onClose={() => setShowKeyModal(false)}
+          onSave={handleSaveGeminiKey}
         />
       )}
     </div>

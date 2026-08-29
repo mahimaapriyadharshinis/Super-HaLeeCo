@@ -108,7 +108,7 @@ export function completeDailyCard(slug) {
   return hydrate(updated);
 }
 
-export async function getOrGenerateQuiz() {
+export async function getOrGenerateQuiz(apiKey) {
   const today = todayStr();
   const set = getDailySet(today);
   if (!set) throw new Error("No daily set for today yet — load Today's Work first.");
@@ -135,6 +135,7 @@ export async function getOrGenerateQuiz() {
         contentHtml: problem.contentHtml,
         code: problem.code,
         lang: problem.lang,
+        apiKey,
       });
       newItems.push({ slug, title: problem.title, ...q });
     } catch (err) {
