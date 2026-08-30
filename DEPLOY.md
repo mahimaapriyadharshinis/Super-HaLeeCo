@@ -87,6 +87,18 @@ Free-tier web services on Render spin down after 15 minutes idle and take
 ~30-60s to wake back up on the next request — expect that cold-start delay
 the first time you open the link after a while.
 
+## Known limitation: "Sync Companies" GitHub API rate limit
+
+"Sync Companies" and "Browse by Company" fetch a public dataset's file list
+from `api.github.com`, unauthenticated, capped at 60 requests/hour **per
+source IP**. On a hosted deploy that IP is shared with other tenants of the
+same platform, so this can 403 ("Could not list company data files") much
+sooner than it ever would on a home network — the app now caches that file
+list for an hour to minimize its own footprint, but if you still hit it,
+set a `GITHUB_TOKEN` env var (a fine-grained token with no scopes, just
+public repo read, from https://github.com/settings/personal-access-tokens/new)
+to raise the limit to 5000/hour.
+
 ## Known limitation: Codeforces fetching inside a container
 
 `codeforcesClient.js` shells out to `curl` to get past Cloudflare (Node's

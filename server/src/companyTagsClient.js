@@ -28,13 +28,32 @@ function parseCompanyCsvLine(line) {
   return { title: match[1].trim(), difficulty: match[2], slug: match[3].toLowerCase() };
 }
 
+function githubHeaders() {
+  const headers = { 'User-Agent': 'haleeco-app', Accept: 'application/vnd.github+json' };
+  // Unauthenticated GitHub API calls are capped at 60/hour per source IP —
+  // on a hosted deploy that IP is shared with other tenants, so it's easy
+  // to hit a 403 rate limit that never happens on a home network. An
+  // optional token (needs no scopes, just public repo read) raises that to
+  // 5000/hour. See DEPLOY.md.
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  return headers;
+}
+
+// The file list rarely changes, so cache it in-memory to keep this app's own
+// footprint on the shared rate limit as small as possible regardless of how
+// often "Sync Companies" or "Browse by Company" gets used.
+let fileListCache = null;
+let fileListCacheAt = 0;
+const FILE_LIST_TTL_MS = 60 * 60 * 1000;
+
 async function fetchCompanyFileList() {
-  const res = await fetch(REPO_CONTENTS_API, {
-    headers: { 'User-Agent': 'haleeco-app', Accept: 'application/vnd.github+json' },
-  });
+  if (fileListCache && Date.now() - fileListCacheAt < FILE_LIST_TTL_MS) return fileListCache;
+  const res = await fetch(REPO_CONTENTS_API, { headers: githubHeaders() });
   if (!res.ok) throw new Error(`Could not list company data files (GitHub API ${res.status}).`);
   const files = await res.json();
-  return files.filter((f) => f.name.endsWith('_alltime.csv')).map((f) => f.name);
+  fileListCache = files.filter((f) => f.name.endsWith('_alltime.csv')).map((f) => f.name);
+  fileListCacheAt = Date.now();
+  return fileListCache;
 }
 
 async function fetchCompanySlugs(filename) {
