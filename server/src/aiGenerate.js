@@ -116,9 +116,11 @@ const QUIZ_SYSTEM_INSTRUCTION =
   'an edge case it handles or misses, what pattern/technique it uses, or how it would need to ' +
   'change for a harder variant of the problem. Do not ask about syntax trivia. Provide exactly ' +
   'four answer options where only one is correct and the other three are plausible, specific, ' +
-  'and not obviously wrong. Respond in exactly this format, nothing else:\n' +
+  'and not obviously wrong. Keep everything terse: the question under 20 words, one line, no ' +
+  'preamble; each answer option under 10 words, a phrase, not a full sentence; the explanation ' +
+  'one short sentence. Respond in exactly this format, nothing else:\n' +
   'QUESTION: <the question>\nA: <option A>\nB: <option B>\nC: <option C>\nD: <option D>\n' +
-  'CORRECT: <A, B, C, or D>\nEXPLANATION: <1-3 sentences on why that option is correct>';
+  'CORRECT: <A, B, C, or D>\nEXPLANATION: <one short sentence on why that option is correct>';
 
 export async function generateQuizQuestion({ title, contentHtml, code, lang, apiKey }) {
   if (!apiKey && !aiEnabled()) {
